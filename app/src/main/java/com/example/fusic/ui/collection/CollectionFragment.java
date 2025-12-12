@@ -71,7 +71,7 @@ public class CollectionFragment extends Fragment {
     }
 
     private void setupFab() {
-        binding.btnCreateCollection.setOnClickListener(v -> showAddCollectionDialog());
+        binding.fabAddCollection.setOnClickListener(v -> showAddCollectionDialog());
     }
 
     private void showAddCollectionDialog() {
