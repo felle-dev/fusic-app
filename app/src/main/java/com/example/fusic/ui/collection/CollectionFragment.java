@@ -1,6 +1,7 @@
 package com.example.fusic.ui.collection;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -53,7 +54,7 @@ public class CollectionFragment extends Fragment {
         gson = new Gson();
 
         setupRecyclerView();
-        setupFab();
+        setupAddButtons();
         loadCollectionData();
 
         return root;
@@ -63,15 +64,29 @@ public class CollectionFragment extends Fragment {
         RecyclerView recyclerView = binding.collectionRecyclerView;
         recyclerView.setHasFixedSize(true);
 
+        // GridLayoutManager with span size for the add button to take full width
         GridLayoutManager gridLayoutManager = new GridLayoutManager(getContext(), 2);
+        gridLayoutManager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
+            @Override
+            public int getSpanSize(int position) {
+                // Make the add button (last item) span both columns
+                if (adapter != null && position == adapter.getItemCount() - 1
+                        && adapter.getItemCount() > 0) {
+                    return 2; // Full width
+                }
+                return 1; // Normal collection items take 1 column
+            }
+        });
         recyclerView.setLayoutManager(gridLayoutManager);
 
         adapter = new CollectionAdapter(new ArrayList<>(), this::onCollectionClick, this::onCollectionLongClick);
+        adapter.setOnAddCollectionClickListener(this::showAddCollectionDialog);
         recyclerView.setAdapter(adapter);
     }
 
-    private void setupFab() {
-        binding.fabAddCollection.setOnClickListener(v -> showAddCollectionDialog());
+    private void setupAddButtons() {
+        // Only the empty state button now
+        binding.btnCreateFirstCollection.setOnClickListener(v -> showAddCollectionDialog());
     }
 
     private void showAddCollectionDialog() {
@@ -129,8 +144,9 @@ public class CollectionFragment extends Fragment {
     }
 
     private void onCollectionClick(Collection collection) {
-        // TODO: Navigate to collection detail screen to view/manage songs
-        Toast.makeText(requireContext(), "Open: " + collection.getName(), Toast.LENGTH_SHORT).show();
+        Intent intent = new Intent(requireContext(), CollectionDetailActivity.class);
+        intent.putExtra("collection", collection);
+        startActivity(intent);
     }
 
     private void onCollectionLongClick(Collection collection) {

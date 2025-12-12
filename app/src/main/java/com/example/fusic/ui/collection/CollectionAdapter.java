@@ -11,16 +11,22 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.fusic.R;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 
+import java.util.ArrayList;
 import java.util.List;
 
-public class CollectionAdapter extends RecyclerView.Adapter<CollectionAdapter.CollectionViewHolder> {
+public class CollectionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+
+    private static final int VIEW_TYPE_COLLECTION = 0;
+    private static final int VIEW_TYPE_ADD_BUTTON = 1;
 
     private List<Collection> collections;
     private Context context;
     private OnCollectionClickListener clickListener;
     private OnCollectionLongClickListener longClickListener;
+    private OnAddCollectionClickListener addClickListener;
 
     public interface OnCollectionClickListener {
         void onCollectionClick(Collection collection);
@@ -30,15 +36,19 @@ public class CollectionAdapter extends RecyclerView.Adapter<CollectionAdapter.Co
         void onCollectionLongClick(Collection collection);
     }
 
+    public interface OnAddCollectionClickListener {
+        void onAddCollectionClick();
+    }
+
     public CollectionAdapter(List<Collection> collections, Context context) {
-        this.collections = collections;
+        this.collections = collections != null ? collections : new ArrayList<>();
         this.context = context;
     }
 
     public CollectionAdapter(List<Collection> collections,
                              OnCollectionClickListener clickListener,
                              OnCollectionLongClickListener longClickListener) {
-        this.collections = collections;
+        this.collections = collections != null ? collections : new ArrayList<>();
         this.clickListener = clickListener;
         this.longClickListener = longClickListener;
     }
@@ -47,7 +57,7 @@ public class CollectionAdapter extends RecyclerView.Adapter<CollectionAdapter.Co
                              Context context,
                              OnCollectionClickListener clickListener,
                              OnCollectionLongClickListener longClickListener) {
-        this.collections = collections;
+        this.collections = collections != null ? collections : new ArrayList<>();
         this.context = context;
         this.clickListener = clickListener;
         this.longClickListener = longClickListener;
@@ -61,30 +71,55 @@ public class CollectionAdapter extends RecyclerView.Adapter<CollectionAdapter.Co
         this.longClickListener = listener;
     }
 
-    @NonNull
-    @Override
-    public CollectionViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_collection, parent, false);
-        if (context == null) {
-            context = parent.getContext();
-        }
-        return new CollectionViewHolder(view);
+    public void setOnAddCollectionClickListener(OnAddCollectionClickListener listener) {
+        this.addClickListener = listener;
     }
 
     @Override
-    public void onBindViewHolder(@NonNull CollectionViewHolder holder, int position) {
-        Collection collection = collections.get(position);
-        holder.bind(collection);
+    public int getItemViewType(int position) {
+        if (position < collections.size()) {
+            return VIEW_TYPE_COLLECTION;
+        } else {
+            return VIEW_TYPE_ADD_BUTTON;
+        }
+    }
+
+    @NonNull
+    @Override
+    public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        if (context == null) {
+            context = parent.getContext();
+        }
+
+        if (viewType == VIEW_TYPE_COLLECTION) {
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_collection, parent, false);
+            return new CollectionViewHolder(view);
+        } else {
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_add_collection, parent, false);
+            return new AddButtonViewHolder(view);
+        }
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+        if (holder instanceof CollectionViewHolder) {
+            Collection collection = collections.get(position);
+            ((CollectionViewHolder) holder).bind(collection);
+        } else if (holder instanceof AddButtonViewHolder) {
+            ((AddButtonViewHolder) holder).bind();
+        }
     }
 
     @Override
     public int getItemCount() {
-        return collections.size();
+        // Collections + 1 for the add button (only show button if there are collections)
+        return collections.isEmpty() ? 0 : collections.size() + 1;
     }
 
     public void updateCollections(List<Collection> newCollections) {
-        this.collections = newCollections;
+        this.collections = newCollections != null ? newCollections : new ArrayList<>();
         notifyDataSetChanged();
     }
 
@@ -123,6 +158,23 @@ public class CollectionAdapter extends RecyclerView.Adapter<CollectionAdapter.Co
                     return true;
                 }
                 return false;
+            });
+        }
+    }
+
+    class AddButtonViewHolder extends RecyclerView.ViewHolder {
+        private MaterialButton addButton;
+
+        public AddButtonViewHolder(@NonNull View itemView) {
+            super(itemView);
+            addButton = itemView.findViewById(R.id.btnAddCollection);
+        }
+
+        public void bind() {
+            addButton.setOnClickListener(v -> {
+                if (addClickListener != null) {
+                    addClickListener.onAddCollectionClick();
+                }
             });
         }
     }

@@ -71,6 +71,10 @@ public class Collection implements Parcelable {
         this.createdAt = createdAt;
     }
 
+    public int getSongCount() {
+        return musicIds != null ? musicIds.size() : 0;
+    }
+
     @Override
     public int describeContents() {
         return 0;

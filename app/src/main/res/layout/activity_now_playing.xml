@@ -219,7 +219,7 @@
 
             <Button
                 style="@style/Widget.Material3.Button.OutlinedButton"
-                android:id="@+id/lyricButton"
+                android:id="@+id/addToCollection"
                 android:layout_width="0dp"
                 android:layout_height="54dp"
                 android:layout_weight="0.5"

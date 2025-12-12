@@ -40,6 +40,8 @@ import com.bumptech.glide.request.transition.Transition;
 import com.example.fusic.R;
 import com.example.fusic.databinding.ActivityNowPlayingBinding;
 import com.example.fusic.service.MusicService;
+import com.example.fusic.ui.collection.Collection;
+import com.example.fusic.ui.collection.CollectionManager;
 import com.example.fusic.ui.music.MusicItem;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
@@ -377,61 +379,114 @@ public class NowPlayingActivity extends AppCompatActivity {
 
         binding.shuffleButton.setOnClickListener(v -> toggleShuffle());
         binding.repeatButton.setOnClickListener(v -> toggleRepeat());
-        binding.lyricButton.setOnClickListener(v -> showLyricsBottomSheet());
+        binding.addToCollection.setOnClickListener(v -> showAddToCollectionBottomSheet());
         binding.queueButton.setOnClickListener(v -> showQueueBottomSheet());
     }
 
-    private void showLyricsBottomSheet() {
-        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(this);
-        View view = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_lyrics, null);
-
-        TextInputEditText lyricsEditText = view.findViewById(R.id.lyricsEditText);
-        MaterialButton saveLyricsButton = view.findViewById(R.id.saveLyricsButton);
-        MaterialButton addLyricsButton = view.findViewById(R.id.addLyricsButton);
-
-        // Load existing lyrics if available
-        String existingLyrics = getLyricsForCurrentSong();
-        if (existingLyrics != null && !existingLyrics.isEmpty()) {
-            lyricsEditText.setText(existingLyrics);
-            lyricsEditText.setEnabled(false);
-            addLyricsButton.setVisibility(View.GONE);
-            saveLyricsButton.setText("Edit");
-        } else {
-            lyricsEditText.setHint("No lyrics available. Add lyrics for this song.");
-            saveLyricsButton.setVisibility(View.GONE);
+    private void showAddToCollectionBottomSheet() {
+        if (currentSong == null) {
+            Toast.makeText(this, "No song is currently playing", Toast.LENGTH_SHORT).show();
+            return;
         }
 
-        addLyricsButton.setOnClickListener(v -> {
-            String lyrics = lyricsEditText.getText().toString().trim();
-            if (!lyrics.isEmpty()) {
-                saveLyricsForCurrentSong(lyrics);
-                Toast.makeText(this, "Lyrics saved successfully", Toast.LENGTH_SHORT).show();
-                bottomSheetDialog.dismiss();
-            } else {
-                Toast.makeText(this, "Please enter lyrics", Toast.LENGTH_SHORT).show();
-            }
-        });
+        CollectionManager collectionManager = new CollectionManager(this);
+        List<Collection> collections = collectionManager.getAllCollections();
 
-        saveLyricsButton.setOnClickListener(v -> {
-            if (lyricsEditText.isEnabled()) {
-                String lyrics = lyricsEditText.getText().toString().trim();
-                if (!lyrics.isEmpty()) {
-                    saveLyricsForCurrentSong(lyrics);
-                    Toast.makeText(this, "Lyrics updated successfully", Toast.LENGTH_SHORT).show();
-                    bottomSheetDialog.dismiss();
-                } else {
-                    Toast.makeText(this, "Please enter lyrics", Toast.LENGTH_SHORT).show();
-                }
-            } else {
-                lyricsEditText.setEnabled(true);
-                saveLyricsButton.setText("Save");
-                addLyricsButton.setVisibility(View.GONE);
-            }
+        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(this);
+        View view = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_add_to_collection, null);
+
+        RecyclerView collectionsRecyclerView = view.findViewById(R.id.collectionsRecyclerView);
+        android.widget.TextView emptyCollectionsText = view.findViewById(R.id.emptyCollectionsText);
+        MaterialButton createNewCollectionButton = view.findViewById(R.id.createNewCollectionButton);
+
+        collectionsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+
+        // Show/hide empty state
+        if (collections.isEmpty()) {
+            collectionsRecyclerView.setVisibility(View.GONE);
+            emptyCollectionsText.setVisibility(View.VISIBLE);
+        } else {
+            collectionsRecyclerView.setVisibility(View.VISIBLE);
+            emptyCollectionsText.setVisibility(View.GONE);
+
+            AddToCollectionAdapter adapter = new AddToCollectionAdapter(
+                    collections,
+                    currentSong.getId(),
+                    collectionManager,
+                    collection -> {
+                        // Handle collection click
+                        boolean added = collectionManager.addSongToCollection(collection.getId(), currentSong.getId());
+                        if (added) {
+                            Toast.makeText(this, "Added to " + collection.getName(), Toast.LENGTH_SHORT).show();
+                            bottomSheetDialog.dismiss();
+                        } else {
+                            Toast.makeText(this, "Song already in " + collection.getName(), Toast.LENGTH_SHORT).show();
+                        }
+                    }
+            );
+            collectionsRecyclerView.setAdapter(adapter);
+        }
+
+        // Create new collection button
+        createNewCollectionButton.setOnClickListener(v -> {
+            bottomSheetDialog.dismiss();
+            showCreateCollectionDialog();
         });
 
         bottomSheetDialog.setContentView(view);
         bottomSheetDialog.show();
     }
+
+    private void showCreateCollectionDialog() {
+        View dialogView = LayoutInflater.from(this)
+                .inflate(R.layout.dialog_add_collection, null);
+
+        TextInputEditText editTextName = dialogView.findViewById(R.id.editTextCollectionName);
+
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("New Collection")
+                .setView(dialogView)
+                .setPositiveButton("Create", (dialog, which) -> {
+                    String collectionName = editTextName.getText().toString().trim();
+                    if (!collectionName.isEmpty()) {
+                        createCollectionAndAddSong(collectionName);
+                    } else {
+                        Toast.makeText(this, "Collection name cannot be empty",
+                                Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void createCollectionAndAddSong(String collectionName) {
+        if (currentSong == null) return;
+
+        CollectionManager collectionManager = new CollectionManager(this);
+
+        // Check for duplicate names
+        List<Collection> existingCollections = collectionManager.getAllCollections();
+        for (Collection collection : existingCollections) {
+            if (collection.getName().equalsIgnoreCase(collectionName)) {
+                Toast.makeText(this, "Collection already exists", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+
+        // Create new collection
+        Collection newCollection = collectionManager.createCollection(collectionName);
+
+        // Add current song to the new collection
+        boolean added = collectionManager.addSongToCollection(newCollection.getId(), currentSong.getId());
+
+        if (added) {
+            Toast.makeText(this, "Created \"" + collectionName + "\" and added song",
+                    Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, "Collection created", Toast.LENGTH_SHORT).show();
+        }
+    }
+
 
     private void showQueueBottomSheet() {
         BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(this);

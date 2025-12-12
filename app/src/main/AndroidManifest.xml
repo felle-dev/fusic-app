@@ -37,6 +37,7 @@
 
         <activity android:name=".ui.album.AlbumDetailActivity" />
         <activity android:name=".ui.artist.ArtistDetailActivity" />
+        <activity android:name=".ui.collection.CollectionDetailActivity" />
         <activity android:name=".ui.pages.search.SearchActivity"
             android:windowSoftInputMode="adjustResize|stateVisible"
             />
