@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.example.relmusic'
+    namespace 'com.example.fusic'
     compileSdk 36
 
     defaultConfig {
-        applicationId "com.example.relmusic"
+        applicationId "com.example.fusic"
         minSdk 24
         targetSdk 36
         versionCode 9
@@ -32,6 +32,7 @@ android {
 }
 
 dependencies {
+    implementation libs.gson
     implementation libs.media
     implementation libs.glide
     implementation libs.palette

@@ -7,25 +7,30 @@
 
     <fragment
         android:id="@+id/navigation_music"
-        android:name="com.example.relmusic.ui.music.MusicFragment"
+        android:name="com.example.fusic.ui.music.MusicFragment"
         android:label="@string/title_music"
         tools:layout="@layout/fragment_music" />
 
     <fragment
         android:id="@+id/navigation_album"
-        android:name="com.example.relmusic.ui.album.AlbumFragment"
+        android:name="com.example.fusic.ui.album.AlbumFragment"
         android:label="@string/title_album"
         tools:layout="@layout/fragment_album" />
 
     <fragment
         android:id="@+id/navigation_settings"
-        android:name="com.example.relmusic.ui.settings.SettingsFragment"
+        android:name="com.example.fusic.ui.settings.SettingsFragment"
         android:label="@string/title_settings"
         tools:layout="@layout/fragment_settings" />
 
     <fragment
         android:id="@+id/navigation_artist"
-        android:name="com.example.relmusic.ui.artist.ArtistFragment"
+        android:name="com.example.fusic.ui.artist.ArtistFragment"
         android:label="@string/title_artist"
         tools:layout="@layout/fragment_artist" />
+    <fragment
+        android:id="@+id/navigation_collection"
+        android:name="com.example.fusic.ui.collection.CollectionFragment"
+        android:label="@string/title_collection"
+        tools:layout="@layout/fragment_collection" />
 </navigation>

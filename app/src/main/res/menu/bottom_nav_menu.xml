@@ -18,6 +18,11 @@
         android:icon="@drawable/ic_artist_24"
         android:title="@string/title_artist" />
 
+    <item
+        android:id="@+id/navigation_collection"
+        android:icon="@drawable/ic_outline_queue_music_24"
+        android:title="@string/title_collection" />
+
 
 <!--        <item-->
 <!--            android:id="@+id/navigation_settings"-->
