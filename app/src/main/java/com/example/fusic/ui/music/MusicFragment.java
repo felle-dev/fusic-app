@@ -47,6 +47,8 @@ public class MusicFragment extends Fragment {
     private static long lastCacheTime = 0;
     private static final long CACHE_DURATION = 5 * 60 * 1000;
     private boolean isLoading = false;
+    private boolean hasLoadedOnce = false; // Track if data has been loaded in this session
+    private boolean permissionJustGranted = false; // Track if permission was just granted
 
     private BroadcastReceiver miniPlayerReceiver = new BroadcastReceiver() {
         @Override
@@ -84,6 +86,8 @@ public class MusicFragment extends Fragment {
 
         executorService = Executors.newSingleThreadExecutor();
         setupRecyclerView();
+
+        // Always attempt to load music data when fragment is created
         loadMusicData();
 
         return root;
@@ -115,14 +119,20 @@ public class MusicFragment extends Fragment {
     }
 
     private void loadMusicData() {
-        if (isCacheValid()) {
+        // If already loading, don't start another load
+        if (isLoading) {
+            return;
+        }
+
+        // Use cache only if it's valid AND we've already loaded once in this session
+        if (isCacheValid() && hasLoadedOnce) {
             loadFromCache();
             return;
         }
 
+        // Otherwise, check permission and load fresh data
         checkPermissionAndLoadMusic();
     }
-
 
     private boolean isCacheValid() {
         return cachedMusicList != null &&
@@ -209,9 +219,11 @@ public class MusicFragment extends Fragment {
 
         if (ContextCompat.checkSelfPermission(requireContext(), permission)
                 != PackageManager.PERMISSION_GRANTED) {
+            // Request permission
             ActivityCompat.requestPermissions(requireActivity(),
                     new String[]{permission}, PERMISSION_REQUEST_CODE);
         } else {
+            // Permission already granted, load immediately
             loadMusicFromDevice();
         }
     }
@@ -223,10 +235,25 @@ public class MusicFragment extends Fragment {
 
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                loadMusicFromDevice();
+                // Permission granted - immediately load music
+                permissionJustGranted = true;
+                Toast.makeText(getContext(), "Loading music files...", Toast.LENGTH_SHORT).show();
+
+                // Use postDelayed to ensure the fragment is fully ready
+                if (binding != null && binding.getRoot() != null) {
+                    binding.getRoot().postDelayed(() -> {
+                        if (getContext() != null && !isLoading) {
+                            loadMusicFromDevice();
+                        }
+                    }, 100);
+                } else {
+                    loadMusicFromDevice();
+                }
             } else {
                 Toast.makeText(getContext(), "Permission denied. Cannot access music files.",
                         Toast.LENGTH_SHORT).show();
+                // Show empty state
+                updateUI();
             }
         }
     }
@@ -296,7 +323,9 @@ public class MusicFragment extends Fragment {
             requireActivity().runOnUiThread(() -> {
                 showLoading(false);
                 isLoading = false;
+                hasLoadedOnce = true; // Mark that we've loaded data at least once
 
+                // Update cache
                 cachedMusicList = new ArrayList<>(tempMusicList);
                 lastCacheTime = System.currentTimeMillis();
 
@@ -312,11 +341,28 @@ public class MusicFragment extends Fragment {
                 showRefreshComplete(true);
 
                 int newCount = tempMusicList.size();
-                if (newCount == previousSize && previousSize > 0) {
+                if (newCount > 0) {
+                    if (previousSize == 0) {
+                        // First load
+                        Toast.makeText(getContext(),
+                                "Loaded " + newCount + " songs",
+                                Toast.LENGTH_SHORT).show();
+                    } else if (newCount == previousSize) {
+                        // Refresh with same count
+                        Toast.makeText(getContext(),
+                                "Music library is up to date (" + newCount + " songs)",
+                                Toast.LENGTH_SHORT).show();
+                    } else {
+                        // Count changed
+                        Toast.makeText(getContext(),
+                                "Library updated: " + newCount + " songs",
+                                Toast.LENGTH_SHORT).show();
+                    }
+                } else {
                     Toast.makeText(getContext(),
-                            "Music library is up to date (" + newCount + " songs)",
+                            "No music files found",
                             Toast.LENGTH_SHORT).show();
-                } 
+                }
             });
         });
     }
@@ -335,16 +381,19 @@ public class MusicFragment extends Fragment {
 
     private void showLoading(boolean show) {
         if (binding == null) return;
+        // Add loading indicator if you have one in your layout
     }
 
     private void showRefreshComplete(boolean success) {
         if (binding == null) return;
+        // Add refresh complete indicator if needed
     }
 
     public void refreshData() {
-
+        // Clear cache to force fresh load
         cachedMusicList = null;
         lastCacheTime = 0;
+        hasLoadedOnce = false;
 
         if (getContext() != null) {
             Toast.makeText(getContext(), "Refreshing music library...", Toast.LENGTH_SHORT).show();
@@ -361,6 +410,24 @@ public class MusicFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+
+        // Check if we have permission and no data loaded
+        String permission;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            permission = Manifest.permission.READ_MEDIA_AUDIO;
+        } else {
+            permission = Manifest.permission.READ_EXTERNAL_STORAGE;
+        }
+
+        // If permission was just granted OR we have permission but no data, load it
+        if (getContext() != null &&
+                ContextCompat.checkSelfPermission(getContext(), permission) == PackageManager.PERMISSION_GRANTED &&
+                musicList.isEmpty() &&
+                !isLoading) {
+            permissionJustGranted = false;
+            loadMusicFromDevice();
+        }
+
         if (getActivity() != null) {
             IntentFilter filter = new IntentFilter("MINI_PLAYER_VISIBILITY_CHANGED");
 
@@ -383,6 +450,7 @@ public class MusicFragment extends Fragment {
             try {
                 getActivity().unregisterReceiver(miniPlayerReceiver);
             } catch (IllegalArgumentException e) {
+                // Receiver not registered
             }
         }
     }

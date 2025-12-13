@@ -45,6 +45,8 @@ public class AlbumFragment extends Fragment {
     private static long lastCacheTime = 0;
     private static final long CACHE_DURATION = 5 * 60 * 1000;
     private boolean isLoading = false;
+    private boolean hasLoadedOnce = false;
+    private boolean permissionJustGranted = false;
 
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
@@ -56,17 +58,35 @@ public class AlbumFragment extends Fragment {
 
         executorService = Executors.newSingleThreadExecutor();
         setupRecyclerView();
+
+        // Always try to load, will check permission inside
         loadAlbumData();
+
+        // Also schedule a delayed check in case permission was just granted
+        root.postDelayed(() -> {
+            if (getContext() != null && albumList.isEmpty() && !isLoading) {
+                String permission;
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    permission = Manifest.permission.READ_MEDIA_AUDIO;
+                } else {
+                    permission = Manifest.permission.READ_EXTERNAL_STORAGE;
+                }
+
+                if (ContextCompat.checkSelfPermission(getContext(), permission) == PackageManager.PERMISSION_GRANTED) {
+                    loadAlbumsFromDevice();
+                }
+            }
+        }, 300);
 
         return root;
     }
+
     private void openAlbumDetail(AlbumItem albumItem) {
         if (getContext() == null) return;
 
         Intent intent = new Intent(getContext(), AlbumDetailActivity.class);
         intent.putExtra("album_item", albumItem);
         startActivity(intent);
-
     }
 
     private void playAllSongsFromAlbum(AlbumItem albumItem) {
@@ -150,6 +170,7 @@ public class AlbumFragment extends Fragment {
 
         return songs;
     }
+
     private void startAlbumPlayback(List<MusicItem> albumSongs) {
         if (getContext() == null || albumSongs.isEmpty()) return;
 
@@ -163,11 +184,15 @@ public class AlbumFragment extends Fragment {
         playIntent.setAction(MusicService.ACTION_PLAY);
         playIntent.putExtra("music_item", albumSongs.get(0));
         getContext().startService(playIntent);
-
     }
 
     private void loadAlbumData() {
-        if (isCacheValid()) {
+        if (isLoading) {
+            return;
+        }
+
+        // Use cache only if it's valid AND we've already loaded once
+        if (isCacheValid() && hasLoadedOnce) {
             loadFromCache();
             return;
         }
@@ -180,8 +205,6 @@ public class AlbumFragment extends Fragment {
                 !cachedAlbumList.isEmpty() &&
                 (System.currentTimeMillis() - lastCacheTime) < CACHE_DURATION;
     }
-
-    // In AlbumFragment.java
 
     private void loadFromCache() {
         if (binding != null && binding.albumRecyclerView != null) {
@@ -201,7 +224,6 @@ public class AlbumFragment extends Fragment {
     private void setupRecyclerView() {
         RecyclerView recyclerView = binding.albumRecyclerView;
 
-        // Performance optimizations
         recyclerView.setHasFixedSize(true);
         recyclerView.setItemViewCacheSize(20);
         recyclerView.setDrawingCacheEnabled(true);
@@ -225,6 +247,7 @@ public class AlbumFragment extends Fragment {
             }
         });
     }
+
     private boolean hasStoragePermission() {
         String permission;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -259,10 +282,23 @@ public class AlbumFragment extends Fragment {
 
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                loadAlbumsFromDevice();
+                permissionJustGranted = true;
+                Toast.makeText(getContext(), "Loading albums...", Toast.LENGTH_SHORT).show();
+
+                // Use postDelayed to ensure the fragment is fully ready
+                if (binding != null && binding.getRoot() != null) {
+                    binding.getRoot().postDelayed(() -> {
+                        if (getContext() != null && !isLoading) {
+                            loadAlbumsFromDevice();
+                        }
+                    }, 100);
+                } else {
+                    loadAlbumsFromDevice();
+                }
             } else {
                 Toast.makeText(getContext(), "Permission denied. Cannot access music files.",
                         Toast.LENGTH_SHORT).show();
+                updateUI();
             }
         }
     }
@@ -339,10 +375,12 @@ public class AlbumFragment extends Fragment {
             requireActivity().runOnUiThread(() -> {
                 showLoading(false);
                 isLoading = false;
+                hasLoadedOnce = true;
 
                 cachedAlbumList = new ArrayList<>(tempAlbumList);
                 lastCacheTime = System.currentTimeMillis();
 
+                int previousSize = albumList.size();
                 albumList.clear();
                 albumList.addAll(tempAlbumList);
 
@@ -351,6 +389,27 @@ public class AlbumFragment extends Fragment {
                 }
 
                 updateUI();
+
+                int newCount = tempAlbumList.size();
+                if (newCount > 0) {
+                    if (previousSize == 0) {
+                        Toast.makeText(getContext(),
+                                "Loaded " + newCount + " albums",
+                                Toast.LENGTH_SHORT).show();
+                    } else if (newCount == previousSize) {
+                        Toast.makeText(getContext(),
+                                "Album library is up to date (" + newCount + " albums)",
+                                Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(getContext(),
+                                "Library updated: " + newCount + " albums",
+                                Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    Toast.makeText(getContext(),
+                            "No albums found",
+                            Toast.LENGTH_SHORT).show();
+                }
             });
         });
     }
@@ -386,12 +445,89 @@ public class AlbumFragment extends Fragment {
     public void refreshData() {
         cachedAlbumList = null;
         lastCacheTime = 0;
+        hasLoadedOnce = false;
+
+        if (getContext() != null) {
+            Toast.makeText(getContext(), "Refreshing album library...", Toast.LENGTH_SHORT).show();
+        }
+
         loadAlbumData();
     }
 
     public static void clearCache() {
         cachedAlbumList = null;
         lastCacheTime = 0;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+
+        // Check if we have permission and no data loaded
+        String permission;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            permission = Manifest.permission.READ_MEDIA_AUDIO;
+        } else {
+            permission = Manifest.permission.READ_EXTERNAL_STORAGE;
+        }
+
+        // If permission granted but no data, load it
+        if (getContext() != null &&
+                ContextCompat.checkSelfPermission(getContext(), permission) == PackageManager.PERMISSION_GRANTED &&
+                albumList.isEmpty() &&
+                !isLoading) {
+            permissionJustGranted = false;
+
+            // Post with delay to ensure fragment is fully visible
+            if (binding != null && binding.getRoot() != null) {
+                binding.getRoot().postDelayed(() -> {
+                    if (getContext() != null && albumList.isEmpty() && !isLoading) {
+                        loadAlbumsFromDevice();
+                    }
+                }, 200);
+            } else {
+                loadAlbumsFromDevice();
+            }
+        }
+    }
+
+    @Override
+    public void setUserVisibleHint(boolean isVisibleToUser) {
+        super.setUserVisibleHint(isVisibleToUser);
+
+        // Check when fragment becomes visible in ViewPager
+        if (isVisibleToUser && isResumed()) {
+            checkAndLoadIfNeeded();
+        }
+    }
+
+    @Override
+    public void onHiddenChanged(boolean hidden) {
+        super.onHiddenChanged(hidden);
+
+        // Check when fragment visibility changes
+        if (!hidden) {
+            checkAndLoadIfNeeded();
+        }
+    }
+
+    private void checkAndLoadIfNeeded() {
+        String permission;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            permission = Manifest.permission.READ_MEDIA_AUDIO;
+        } else {
+            permission = Manifest.permission.READ_EXTERNAL_STORAGE;
+        }
+
+        // If we have permission but no data and not loading, load it
+        if (getContext() != null &&
+                ContextCompat.checkSelfPermission(getContext(), permission) == PackageManager.PERMISSION_GRANTED &&
+                albumList.isEmpty() &&
+                !isLoading &&
+                binding != null) {
+
+            loadAlbumsFromDevice();
+        }
     }
 
     @Override
