@@ -223,8 +223,6 @@ public class MainActivity extends AppCompatActivity {
             return 2;
         } else if (menuId == R.id.navigation_collection) {
             return 3;
-        } else if (menuId == R.id.navigation_settings) {
-            return 4;
         }
         return -1;
     }
@@ -242,9 +240,6 @@ public class MainActivity extends AppCompatActivity {
                 break;
             case 3:
                 navView.setSelectedItemId(R.id.navigation_collection);
-                break;
-            case 4:
-                navView.setSelectedItemId(R.id.navigation_settings);
                 break;
         }
     }

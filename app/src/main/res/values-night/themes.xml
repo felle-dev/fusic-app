@@ -1,5 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <style name="Theme.RelMusic" parent="Theme.Material3Expressive.Dark.NoActionBar">
+    <style name="Theme.Fusic" parent="Theme.Material3Expressive.Dark.NoActionBar">
         <item name="android:fontFamily">@font/poppins</item>
         <item name="fontFamily">@font/poppins</item>
 

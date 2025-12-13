@@ -35,6 +35,6 @@ public class MainViewPagerAdapter extends FragmentStateAdapter {
 
     @Override
     public int getItemCount() {
-        return 5; // Number of fragments (Music, Album, Artist, Collection, Settings)
+        return 4;
     }
 }
