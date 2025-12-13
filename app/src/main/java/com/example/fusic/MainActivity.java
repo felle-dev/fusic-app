@@ -28,11 +28,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowCompat;
 import androidx.fragment.app.Fragment;
-import androidx.navigation.NavController;
-import androidx.navigation.NavDestination;
-import androidx.navigation.Navigation;
-import androidx.navigation.fragment.NavHostFragment;
-import androidx.navigation.ui.NavigationUI;
+import androidx.viewpager2.widget.ViewPager2;
 
 import com.bumptech.glide.Glide;
 import com.example.fusic.databinding.ActivityMainBinding;
@@ -46,13 +42,17 @@ public class MainActivity extends AppCompatActivity {
     private static final int REFRESH_ANIMATION_DURATION = 1000;
     private static final int REFRESH_COOLDOWN_DURATION = 2000;
     private static final int MINI_PLAYER_ANIMATION_DURATION = 300;
-    private static final int ALBUM_ART_ROTATION_DURATION = 8000;
     private static final float TOOLBAR_FADE_THRESHOLD = 0.7f;
 
     private ActivityMainBinding binding;
     private TextView toolbarTitle;
     private CollapsingToolbarLayout collapsingToolbar;
     private String currentTitle = "Fusic";
+
+    // ViewPager2 for swipeable fragments
+    private ViewPager2 viewPager;
+    private MainViewPagerAdapter pagerAdapter;
+    private BottomNavigationView navView;
 
     // Mini Player Components
     private MaterialCardView miniPlayerContainer;
@@ -129,7 +129,7 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
 
-            setupNavigation();  // Just call it directly
+            setupViewPagerAndNavigation();
             setupToolbarActions();
             setupSearchButton();
             registerMusicUpdateReceiver();
@@ -167,41 +167,117 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void setupNavigation() {
+    private void setupViewPagerAndNavigation() {
         try {
-            BottomNavigationView navView = findViewById(R.id.nav_view);
-            if (navView == null) {
-                Log.e(TAG, "BottomNavigationView is null");
+            viewPager = findViewById(R.id.view_pager);
+            navView = findViewById(R.id.nav_view);
+
+            if (viewPager == null || navView == null) {
+                Log.e(TAG, "ViewPager or BottomNavigationView is null");
                 return;
             }
 
-            // Get NavHostFragment from FragmentManager
-            androidx.fragment.app.Fragment navHostFragment =
-                    getSupportFragmentManager().findFragmentById(R.id.nav_host_fragment_activity_main);
+            // Setup ViewPager2 adapter
+            pagerAdapter = new MainViewPagerAdapter(this);
+            viewPager.setAdapter(pagerAdapter);
 
-            if (navHostFragment != null) {
-                NavController navController = NavHostFragment.findNavController(navHostFragment);
+            // Disable over-scroll effect for smoother experience
+            viewPager.setOffscreenPageLimit(1);
 
-                // Connect BottomNavigationView with NavController
-                NavigationUI.setupWithNavController(navView, navController);
-
-                // Add listener for title updates
-                navController.addOnDestinationChangedListener((controller, destination, arguments) -> {
+            // Sync ViewPager with BottomNavigationView
+            viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+                @Override
+                public void onPageSelected(int position) {
+                    super.onPageSelected(position);
                     if (!isActivityDestroyed) {
-                        updateTitle(destination.getId());
+                        updateNavigationSelection(position);
+                        updateTitleForPosition(position);
                     }
-                });
+                }
+            });
 
-                Log.d(TAG, "Navigation setup completed successfully");
-            } else {
-                Log.e(TAG, "NavHostFragment not found");
-            }
+            // Setup BottomNavigationView click listener
+            navView.setOnItemSelectedListener(item -> {
+                int itemId = item.getItemId();
+                int position = getPositionForMenuId(itemId);
+                if (position != -1) {
+                    viewPager.setCurrentItem(position, true);
+                    return true;
+                }
+                return false;
+            });
+
+            Log.d(TAG, "ViewPager and Navigation setup completed successfully");
 
         } catch (Exception e) {
-            Log.e(TAG, "Error setting up navigation: " + e.getMessage(), e);
+            Log.e(TAG, "Error setting up ViewPager: " + e.getMessage(), e);
         }
     }
 
+    private int getPositionForMenuId(int menuId) {
+        if (menuId == R.id.navigation_music) {
+            return 0;
+        } else if (menuId == R.id.navigation_album) {
+            return 1;
+        } else if (menuId == R.id.navigation_artist) {
+            return 2;
+        } else if (menuId == R.id.navigation_collection) {
+            return 3;
+        } else if (menuId == R.id.navigation_settings) {
+            return 4;
+        }
+        return -1;
+    }
+
+    private void updateNavigationSelection(int position) {
+        switch (position) {
+            case 0:
+                navView.setSelectedItemId(R.id.navigation_music);
+                break;
+            case 1:
+                navView.setSelectedItemId(R.id.navigation_album);
+                break;
+            case 2:
+                navView.setSelectedItemId(R.id.navigation_artist);
+                break;
+            case 3:
+                navView.setSelectedItemId(R.id.navigation_collection);
+                break;
+            case 4:
+                navView.setSelectedItemId(R.id.navigation_settings);
+                break;
+        }
+    }
+
+    private void updateTitleForPosition(int position) {
+        switch (position) {
+            case 0:
+                currentTitle = "Music";
+                break;
+            case 1:
+                currentTitle = "Albums";
+                break;
+            case 2:
+                currentTitle = "Artist";
+                break;
+            case 3:
+                currentTitle = "Collection";
+                break;
+            case 4:
+                currentTitle = "Settings";
+                break;
+            default:
+                currentTitle = "Fusic";
+                break;
+        }
+
+        if (toolbarTitle != null) {
+            toolbarTitle.setText(currentTitle);
+        }
+        if (collapsingToolbar != null) {
+            collapsingToolbar.setTitle(currentTitle);
+        }
+    }
 
     private void setupToolbarActions() {
         try {
@@ -229,43 +305,29 @@ public class MainActivity extends AppCompatActivity {
             MaterialButton refreshButton = findViewById(R.id.refresh_button);
             if (refreshButton == null) return;
 
-            // Animate refresh button
             animateRefreshButton(refreshButton);
-
-            // Clear all caches
             clearAllFragmentCaches();
 
-            NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_activity_main);
-            NavDestination currentDestination = navController.getCurrentDestination();
+            int currentPosition = viewPager.getCurrentItem();
 
-            if (currentDestination == null) {
-                refreshAllFragmentsInBackground();
-                showRefreshToast("Refreshing all libraries...");
-                return;
+            // Refresh based on current position
+            switch (currentPosition) {
+                case 0: // Music
+                    showRefreshToast("Refreshing music library...");
+                    break;
+                case 1: // Album
+                    showRefreshToast("Refreshing album library...");
+                    break;
+                case 2: // Artist
+                    showRefreshToast("Refreshing artist library...");
+                    break;
+                default:
+                    showRefreshToast("Refreshing library...");
+                    break;
             }
 
-            int destinationId = currentDestination.getId();
-
-            // Refresh based on current destination
-            if (destinationId == R.id.navigation_music) {
-                refreshFragmentByType(com.example.fusic.ui.music.MusicFragment.class);
-                refreshFragmentInBackground(com.example.fusic.ui.album.AlbumFragment.class);
-                refreshFragmentInBackground(com.example.fusic.ui.artist.ArtistFragment.class);
-                showRefreshToast("Refreshing music, album, and artist library...");
-            } else if (destinationId == R.id.navigation_album) {
-                refreshFragmentByType(com.example.fusic.ui.album.AlbumFragment.class);
-                refreshFragmentInBackground(com.example.fusic.ui.music.MusicFragment.class);
-                refreshFragmentInBackground(com.example.fusic.ui.artist.ArtistFragment.class);
-                showRefreshToast("Refreshing album, music, and artist library...");
-            } else if (destinationId == R.id.navigation_artist) {
-                refreshFragmentByType(com.example.fusic.ui.artist.ArtistFragment.class);
-                refreshFragmentInBackground(com.example.fusic.ui.music.MusicFragment.class);
-                refreshFragmentInBackground(com.example.fusic.ui.album.AlbumFragment.class);
-                showRefreshToast("Refreshing artist, music, and album library...");
-            } else {
-                refreshAllFragmentsInBackground();
-                showRefreshToast("Refreshing all libraries...");
-            }
+            // Force adapter to recreate fragments
+            pagerAdapter.notifyDataSetChanged();
 
         } catch (Exception e) {
             Log.e(TAG, "Error refreshing fragments: " + e.getMessage(), e);
@@ -309,61 +371,6 @@ public class MainActivity extends AppCompatActivity {
             refreshButton.setEnabled(true);
             refreshButton.setRotation(0f);
         }
-    }
-
-    // Generic method to refresh fragments by type
-    private <T extends Fragment> void refreshFragmentByType(Class<T> fragmentClass) {
-        try {
-            Fragment navHostFragment = getSupportFragmentManager()
-                    .findFragmentById(R.id.nav_host_fragment_activity_main);
-
-            if (navHostFragment != null) {
-                Fragment currentFragment = navHostFragment.getChildFragmentManager()
-                        .getPrimaryNavigationFragment();
-
-                if (currentFragment != null && fragmentClass.isInstance(currentFragment)) {
-                    refreshFragment(currentFragment);
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error refreshing fragment by type: " + e.getMessage(), e);
-        }
-    }
-
-    // Generic method to refresh fragments in background
-    private <T extends Fragment> void refreshFragmentInBackground(Class<T> fragmentClass) {
-        try {
-            Fragment navHostFragment = getSupportFragmentManager()
-                    .findFragmentById(R.id.nav_host_fragment_activity_main);
-
-            if (navHostFragment != null) {
-                for (Fragment fragment : navHostFragment.getChildFragmentManager().getFragments()) {
-                    if (fragmentClass.isInstance(fragment)) {
-                        refreshFragment(fragment);
-                        break;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error refreshing fragment in background: " + e.getMessage(), e);
-        }
-    }
-
-    // Centralized fragment refresh method
-    private void refreshFragment(Fragment fragment) {
-        if (fragment instanceof com.example.fusic.ui.music.MusicFragment) {
-            ((com.example.fusic.ui.music.MusicFragment) fragment).refreshData();
-        } else if (fragment instanceof com.example.fusic.ui.album.AlbumFragment) {
-            ((com.example.fusic.ui.album.AlbumFragment) fragment).refreshData();
-        } else if (fragment instanceof com.example.fusic.ui.artist.ArtistFragment) {
-            ((com.example.fusic.ui.artist.ArtistFragment) fragment).refreshData();
-        }
-    }
-
-    private void refreshAllFragmentsInBackground() {
-        refreshFragmentInBackground(com.example.fusic.ui.music.MusicFragment.class);
-        refreshFragmentInBackground(com.example.fusic.ui.album.AlbumFragment.class);
-        refreshFragmentInBackground(com.example.fusic.ui.artist.ArtistFragment.class);
     }
 
     private void enableEdgeToEdge() {
@@ -478,6 +485,7 @@ public class MainActivity extends AppCompatActivity {
             Log.e(TAG, "Error sending service action " + action + ": " + e.getMessage(), e);
         }
     }
+
     public void showMiniPlayer(MusicItem musicItem) {
         if (isActivityDestroyed || isFinishing() || isDestroyed() || musicItem == null) {
             return;
@@ -619,35 +627,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void updateTitle(int destinationId) {
-        if (isActivityDestroyed) return;
-
-        try {
-            if (destinationId == R.id.navigation_music) {
-                currentTitle = "Music";
-            } else if (destinationId == R.id.navigation_album) {
-                currentTitle = "Albums";
-            } else if (destinationId == R.id.navigation_settings) {
-                currentTitle = "Settings";
-            } else if (destinationId == R.id.navigation_artist) {
-                currentTitle = "Artist";
-            } else if (destinationId == R.id.navigation_collection) {
-            currentTitle = "Collection";
-            } else {
-                currentTitle = "Fusic";
-            }
-
-            if (toolbarTitle != null) {
-                toolbarTitle.setText(currentTitle);
-            }
-            if (collapsingToolbar != null) {
-                collapsingToolbar.setTitle(currentTitle);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error updating title: " + e.getMessage(), e);
-        }
-    }
-
     private void setupCollapsingToolbarTitleAnimation(AppBarLayout appBarLayout) {
         if (appBarLayout == null) return;
 
@@ -665,7 +644,6 @@ public class MainActivity extends AppCompatActivity {
                         int totalScrollRange = appBar.getTotalScrollRange();
                         float percentage = Math.abs(verticalOffset) / (float) totalScrollRange;
 
-                        // Only update when crossing threshold to reduce calculations
                         boolean shouldCollapse = percentage > TOOLBAR_FADE_THRESHOLD;
 
                         if (shouldCollapse != isCollapsed) {
@@ -718,10 +696,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         isActivityDestroyed = true;
 
-        // Remove all pending handler callbacks first
         mainHandler.removeCallbacksAndMessages(null);
 
-        // Unregister broadcast receiver
         if (isReceiverRegistered) {
             try {
                 unregisterReceiver(musicUpdateReceiver);
@@ -736,7 +712,6 @@ public class MainActivity extends AppCompatActivity {
         try {
             currentPlayingItem = null;
 
-            // Only clear Glide if activity is finishing (not just recreating)
             if (isFinishing() && miniAlbumArt != null) {
                 try {
                     Glide.with(getApplicationContext()).clear(miniAlbumArt);
