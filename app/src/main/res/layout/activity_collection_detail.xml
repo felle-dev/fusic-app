@@ -27,11 +27,9 @@
                 android:layout_height="match_parent"
                 android:scaleType="centerCrop"
                 android:fitsSystemWindows="true"
-                android:visibility="gone"
                 app:layout_collapseMode="parallax"
-                android:foreground="@color/black_overlay"
                 app:layout_collapseParallaxMultiplier="0.7"
-                android:src="@drawable/ic_outline_queue_music_24"
+                android:src="?attr/colorSurfaceContainerHigh"
                 android:contentDescription="Collection background image" />
 
             <com.google.android.material.appbar.MaterialToolbar

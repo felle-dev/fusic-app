@@ -1,76 +1,107 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="2dp"
-    app:cardElevation="0dp"
-    style="@style/Widget.Material3.CardView.Filled">
+    android:layout_marginHorizontal="8dp"
+    android:layout_marginVertical="4dp"
+    app:cardElevation="2dp"
+    app:cardCornerRadius="12dp"
+    app:strokeWidth="0dp">
 
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingHorizontal="12dp"
-        android:paddingVertical="16dp"
-        android:gravity="center_vertical">
+        android:padding="12dp">
 
+        <!-- Queue Position -->
         <TextView
             android:id="@+id/queuePosition"
-            android:layout_width="24dp"
-            android:layout_height="28dp"
-            android:gravity="center"
+            android:layout_width="32dp"
+            android:layout_height="wrap_content"
+            android:text="1"
             android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-            android:textStyle="bold"
-            tools:text="1" />
+            android:textAlignment="center"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
 
-        <ImageView
+        <!-- Album Art -->
+        <com.google.android.material.imageview.ShapeableImageView
             android:id="@+id/queueAlbumArt"
             android:layout_width="48dp"
             android:layout_height="48dp"
-            android:layout_marginStart="8dp"
             android:scaleType="centerCrop"
-            android:contentDescription="Album Art"
-            android:src="@drawable/ic_outline_music_note_24" />
+            android:src="@drawable/ic_outline_music_note_24"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium"
+            app:layout_constraintStart_toEndOf="@id/queuePosition"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:layout_marginStart="8dp" />
 
+        <!-- Song Info Container -->
         <LinearLayout
+            android:id="@+id/songInfoContainer"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:orientation="vertical"
             android:layout_marginStart="12dp"
-            android:layout_marginEnd="8dp">
+            android:layout_marginEnd="8dp"
+            app:layout_constraintStart_toEndOf="@id/queueAlbumArt"
+            app:layout_constraintEnd_toStartOf="@id/queueSongDuration"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent">
 
             <TextView
                 android:id="@+id/queueSongTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:ellipsize="end"
+                android:text="Song Title"
+                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                android:textColor="?attr/colorOnSurface"
                 android:maxLines="1"
-                android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
-                tools:text="Song Title" />
+                android:ellipsize="end" />
 
             <TextView
                 android:id="@+id/queueSongArtist"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                android:text="Artist Name"
+                android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:maxLines="1"
                 android:ellipsize="end"
-                android:layout_marginTop="2dp"
-                tools:text="Artist Name" />
+                android:layout_marginTop="2dp" />
 
         </LinearLayout>
 
+        <!-- Duration -->
         <TextView
             android:id="@+id/queueSongDuration"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:text="3:45"
             android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-            android:layout_marginStart="8dp"
-            tools:text="3:45" />
+            android:textColor="?attr/colorOnSurfaceVariant"
+            app:layout_constraintEnd_toStartOf="@id/dragHandle"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:layout_marginEnd="8dp" />
 
-    </LinearLayout>
+        <!-- Drag Handle -->
+        <ImageView
+            android:id="@+id/dragHandle"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_outline_queue_music_24"
+            android:contentDescription="Drag to reorder"
+            app:tint="?attr/colorOnSurfaceVariant"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </com.google.android.material.card.MaterialCardView>

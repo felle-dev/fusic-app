@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.media.MediaPlayer;
@@ -31,6 +32,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.palette.graphics.Palette;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -57,7 +59,6 @@ public class NowPlayingActivity extends AppCompatActivity {
 
     private static final String LYRICS_PREFS = "LyricsPreferences";
 
-    // Broadcast action constants - must match CollectionFragment
     private static final String ACTION_COLLECTION_CHANGED = "com.example.fusic.COLLECTION_CHANGED";
     private static final String ACTION_COLLECTION_CREATED = "com.example.fusic.COLLECTION_CREATED";
     private static final String ACTION_SONG_ADDED_TO_COLLECTION = "com.example.fusic.SONG_ADDED_TO_COLLECTION";
@@ -383,7 +384,6 @@ public class NowPlayingActivity extends AppCompatActivity {
                         boolean added = collectionManager.addSongToCollection(collection.getId(), currentSong.getId());
                         if (added) {
                             Toast.makeText(this, "Added to " + collection.getName(), Toast.LENGTH_SHORT).show();
-                            // Broadcast that a song was added to collection
                             broadcastCollectionChange(ACTION_SONG_ADDED_TO_COLLECTION);
                             bottomSheetDialog.dismiss();
                         } else {
@@ -430,7 +430,6 @@ public class NowPlayingActivity extends AppCompatActivity {
 
         CollectionManager collectionManager = new CollectionManager(this);
 
-        // Check for duplicate names
         List<Collection> existingCollections = collectionManager.getAllCollections();
         for (Collection collection : existingCollections) {
             if (collection.getName().equalsIgnoreCase(collectionName)) {
@@ -439,50 +438,19 @@ public class NowPlayingActivity extends AppCompatActivity {
             }
         }
 
-        // Create new collection
         Collection newCollection = collectionManager.createCollection(collectionName);
 
-        // Add current song to the new collection
         boolean added = collectionManager.addSongToCollection(newCollection.getId(), currentSong.getId());
 
         if (added) {
             Toast.makeText(this, "Created \"" + collectionName + "\" and added song",
                     Toast.LENGTH_SHORT).show();
-            // Broadcast that a new collection was created
             broadcastCollectionChange(ACTION_COLLECTION_CREATED);
         } else {
             Toast.makeText(this, "Collection created", Toast.LENGTH_SHORT).show();
-            // Still broadcast collection creation even if song wasn't added
             broadcastCollectionChange(ACTION_COLLECTION_CREATED);
         }
     }
-
-    private void showQueueBottomSheet() {
-        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(this);
-        View view = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_queue, null);
-
-        RecyclerView queueRecyclerView = view.findViewById(R.id.queueRecyclerView);
-        android.widget.TextView emptyQueueText = view.findViewById(R.id.emptyQueueText);
-
-        queueRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-
-        List<MusicItem> queueList = getUpcomingQueue();
-
-        if (queueList.isEmpty()) {
-            queueRecyclerView.setVisibility(View.GONE);
-            emptyQueueText.setVisibility(View.VISIBLE);
-        } else {
-            queueRecyclerView.setVisibility(View.VISIBLE);
-            emptyQueueText.setVisibility(View.GONE);
-
-            QueueAdapter queueAdapter = new QueueAdapter(queueList);
-            queueRecyclerView.setAdapter(queueAdapter);
-        }
-
-        bottomSheetDialog.setContentView(view);
-        bottomSheetDialog.show();
-    }
-
     private List<MusicItem> getUpcomingQueue() {
         if (musicService != null) {
             return musicService.getUpcomingQueue();
@@ -625,7 +593,6 @@ public class NowPlayingActivity extends AppCompatActivity {
                             binding.currentTime.setText(formatDuration(currentPosition));
                         }
                     } catch (IllegalStateException e) {
-                        // Handle media player state exceptions
                     }
                 }
 
@@ -670,12 +637,72 @@ public class NowPlayingActivity extends AppCompatActivity {
         }
     }
 
+    private void showQueueBottomSheet() {
+        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(this);
+        View view = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_queue, null);
+
+        RecyclerView queueRecyclerView = view.findViewById(R.id.queueRecyclerView);
+        android.widget.TextView emptyQueueText = view.findViewById(R.id.emptyQueueText);
+
+        queueRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+
+        List<MusicItem> queueList = getUpcomingQueue();
+
+        if (queueList.isEmpty()) {
+            queueRecyclerView.setVisibility(View.GONE);
+            emptyQueueText.setVisibility(View.VISIBLE);
+        } else {
+            queueRecyclerView.setVisibility(View.VISIBLE);
+            emptyQueueText.setVisibility(View.GONE);
+
+            QueueAdapter queueAdapter = new QueueAdapter(
+                    queueList,
+                    (fromPosition, toPosition) -> {
+                        if (musicService != null) {
+                            musicService.moveQueueItem(fromPosition, toPosition);
+                        }
+                    },
+                    (position, removedItem) -> {
+                        if (musicService != null) {
+                            musicService.removeQueueItem(position);
+                            Toast.makeText(this, "Removed from queue", Toast.LENGTH_SHORT).show();
+                        }
+
+                        if (queueList.isEmpty()) {
+                            queueRecyclerView.setVisibility(View.GONE);
+                            emptyQueueText.setVisibility(View.VISIBLE);
+                        }
+                    }
+            );
+            queueRecyclerView.setAdapter(queueAdapter);
+
+            ItemTouchHelper itemTouchHelper = new ItemTouchHelper(new QueueItemTouchHelperCallback(queueAdapter));
+            itemTouchHelper.attachToRecyclerView(queueRecyclerView);
+        }
+
+        bottomSheetDialog.setContentView(view);
+        bottomSheetDialog.show();
+    }
+
     private static class QueueAdapter extends RecyclerView.Adapter<QueueAdapter.QueueViewHolder> {
 
         private List<MusicItem> queueList;
+        private OnQueueItemMovedListener moveListener;
+        private OnQueueItemRemovedListener removeListener;
 
-        public QueueAdapter(List<MusicItem> queueList) {
+        public interface OnQueueItemMovedListener {
+            void onQueueItemMoved(int fromPosition, int toPosition);
+        }
+
+        public interface OnQueueItemRemovedListener {
+            void onQueueItemRemoved(int position, MusicItem item);
+        }
+
+        public QueueAdapter(List<MusicItem> queueList, OnQueueItemMovedListener moveListener,
+                            OnQueueItemRemovedListener removeListener) {
             this.queueList = queueList;
+            this.moveListener = moveListener;
+            this.removeListener = removeListener;
         }
 
         @Override
@@ -696,6 +723,37 @@ public class NowPlayingActivity extends AppCompatActivity {
             return queueList.size();
         }
 
+        public boolean onItemMove(int fromPosition, int toPosition) {
+            if (fromPosition < toPosition) {
+                for (int i = fromPosition; i < toPosition; i++) {
+                    java.util.Collections.swap(queueList, i, i + 1);
+                }
+            } else {
+                for (int i = fromPosition; i > toPosition; i--) {
+                    java.util.Collections.swap(queueList, i, i - 1);
+                }
+            }
+            notifyItemMoved(fromPosition, toPosition);
+            return true;
+        }
+
+        public void onItemMoveFinished(int fromPosition, int toPosition) {
+            if (moveListener != null) {
+                moveListener.onQueueItemMoved(fromPosition, toPosition);
+            }
+        }
+
+        public void onItemSwiped(int position) {
+            if (position >= 0 && position < queueList.size()) {
+                MusicItem removedItem = queueList.remove(position);
+                notifyItemRemoved(position);
+
+                if (removeListener != null) {
+                    removeListener.onQueueItemRemoved(position, removedItem);
+                }
+            }
+        }
+
         static class QueueViewHolder extends RecyclerView.ViewHolder {
 
             private android.widget.TextView queuePosition;
@@ -703,6 +761,7 @@ public class NowPlayingActivity extends AppCompatActivity {
             private android.widget.TextView queueSongTitle;
             private android.widget.TextView queueSongArtist;
             private android.widget.TextView queueSongDuration;
+            private android.widget.ImageView dragHandle;
 
             public QueueViewHolder(View itemView) {
                 super(itemView);
@@ -711,6 +770,7 @@ public class NowPlayingActivity extends AppCompatActivity {
                 queueSongTitle = itemView.findViewById(R.id.queueSongTitle);
                 queueSongArtist = itemView.findViewById(R.id.queueSongArtist);
                 queueSongDuration = itemView.findViewById(R.id.queueSongDuration);
+                dragHandle = itemView.findViewById(R.id.dragHandle);
             }
 
             void bind(MusicItem item, int position) {
@@ -729,6 +789,94 @@ public class NowPlayingActivity extends AppCompatActivity {
                         .placeholder(R.drawable.ic_outline_music_note_24)
                         .error(R.drawable.ic_outline_music_note_24)
                         .into(queueAlbumArt);
+            }
+        }
+    }
+
+    private static class QueueItemTouchHelperCallback extends ItemTouchHelper.Callback {
+
+        private final QueueAdapter adapter;
+        private int dragFrom = -1;
+        private int dragTo = -1;
+
+        public QueueItemTouchHelperCallback(QueueAdapter adapter) {
+            this.adapter = adapter;
+        }
+
+        @Override
+        public boolean isLongPressDragEnabled() {
+            return true;
+        }
+
+        @Override
+        public boolean isItemViewSwipeEnabled() {
+            return true;
+        }
+
+        @Override
+        public int getMovementFlags(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder) {
+            int dragFlags = ItemTouchHelper.UP | ItemTouchHelper.DOWN;
+            int swipeFlags = ItemTouchHelper.START | ItemTouchHelper.END;
+            return makeMovementFlags(dragFlags, swipeFlags);
+        }
+
+        @Override
+        public boolean onMove(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder,
+                              RecyclerView.ViewHolder target) {
+            int fromPosition = viewHolder.getAdapterPosition();
+            int toPosition = target.getAdapterPosition();
+
+            if (dragFrom == -1) {
+                dragFrom = fromPosition;
+            }
+            dragTo = toPosition;
+
+            adapter.onItemMove(fromPosition, toPosition);
+            return true;
+        }
+
+        @Override
+        public void onSwiped(RecyclerView.ViewHolder viewHolder, int direction) {
+            int position = viewHolder.getAdapterPosition();
+            adapter.onItemSwiped(position);
+        }
+
+        @Override
+        public void onSelectedChanged(RecyclerView.ViewHolder viewHolder, int actionState) {
+            super.onSelectedChanged(viewHolder, actionState);
+
+            if (actionState == ItemTouchHelper.ACTION_STATE_DRAG) {
+                viewHolder.itemView.setAlpha(0.7f);
+                viewHolder.itemView.setScaleX(1.05f);
+                viewHolder.itemView.setScaleY(1.05f);
+            }
+        }
+
+        @Override
+        public void clearView(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder) {
+            super.clearView(recyclerView, viewHolder);
+
+            viewHolder.itemView.setAlpha(1.0f);
+            viewHolder.itemView.setScaleX(1.0f);
+            viewHolder.itemView.setScaleY(1.0f);
+
+            if (dragFrom != -1 && dragTo != -1 && dragFrom != dragTo) {
+                adapter.onItemMoveFinished(dragFrom, dragTo);
+            }
+
+            dragFrom = -1;
+            dragTo = -1;
+        }
+
+        @Override
+        public void onChildDraw(Canvas c, RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder,
+                                float dX, float dY, int actionState, boolean isCurrentlyActive) {
+            if (actionState == ItemTouchHelper.ACTION_STATE_SWIPE) {
+                final float alpha = 1.0f - Math.abs(dX) / (float) viewHolder.itemView.getWidth();
+                viewHolder.itemView.setAlpha(alpha);
+                viewHolder.itemView.setTranslationX(dX);
+            } else {
+                super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive);
             }
         }
     }

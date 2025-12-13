@@ -23,15 +23,23 @@ public class MusicAdapter extends RecyclerView.Adapter<MusicAdapter.MusicViewHol
     private List<MusicItem> musicList;
     private Context context;
     private OnMusicItemClickListener listener;
+    private OnMusicItemLongClickListener longClickListener;
 
     public interface OnMusicItemClickListener {
         void onMusicItemClick(MusicItem musicItem);
         void onPlayButtonClick(MusicItem musicItem);
     }
 
+    public interface OnMusicItemLongClickListener {
+        boolean onMusicItemLongClick(MusicItem musicItem);
+    }
+
     public MusicAdapter(List<MusicItem> musicList, Context context) {
         this.musicList = musicList;
         this.context = context;
+    }
+    public void setOnMusicItemLongClickListener(OnMusicItemLongClickListener listener) {
+        this.longClickListener = listener;
     }
 
     public void setOnMusicItemClickListener(OnMusicItemClickListener listener) {
@@ -65,6 +73,13 @@ public class MusicAdapter extends RecyclerView.Adapter<MusicAdapter.MusicViewHol
             if (listener != null) {
                 listener.onMusicItemClick(musicItem);
             }
+        });
+
+        holder.itemView.setOnLongClickListener(v -> {
+            if (longClickListener != null) {
+                return longClickListener.onMusicItemLongClick(musicItem);
+            }
+            return false;
         });
 
         holder.playButton.setOnClickListener(v -> {

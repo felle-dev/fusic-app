@@ -1,5 +1,9 @@
 package com.example.fusic.ui.music;
 
+
+import static com.example.fusic.ui.collection.CollectionFragment.ACTION_COLLECTION_CREATED;
+import static com.example.fusic.ui.collection.CollectionFragment.ACTION_SONG_ADDED_TO_COLLECTION;
+
 import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
@@ -28,7 +32,15 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.fusic.R;
 import com.example.fusic.databinding.FragmentMusicBinding;
 import com.example.fusic.service.MusicService;
+import com.example.fusic.ui.pages.nowplaying.AddToCollectionAdapter;
 import com.example.fusic.ui.pages.nowplaying.NowPlayingActivity;
+
+import com.example.fusic.ui.collection.Collection;
+import com.example.fusic.ui.collection.CollectionManager;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.TextInputEditText;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +59,7 @@ public class MusicFragment extends Fragment {
     private static long lastCacheTime = 0;
     private static final long CACHE_DURATION = 5 * 60 * 1000;
     private boolean isLoading = false;
+    private CollectionManager collectionManager;
     private boolean hasLoadedOnce = false; // Track if data has been loaded in this session
     private boolean permissionJustGranted = false; // Track if permission was just granted
 
@@ -76,6 +89,7 @@ public class MusicFragment extends Fragment {
         }
     };
 
+    @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
         MusicViewModel musicViewModel =
@@ -85,9 +99,9 @@ public class MusicFragment extends Fragment {
         View root = binding.getRoot();
 
         executorService = Executors.newSingleThreadExecutor();
+        collectionManager = new CollectionManager(requireContext()); // Add this line
         setupRecyclerView();
 
-        // Always attempt to load music data when fragment is created
         loadMusicData();
 
         return root;
@@ -116,6 +130,152 @@ public class MusicFragment extends Fragment {
                 startMusicService(musicItem);
             }
         });
+
+        // Add long-click listener for adding to collection
+        musicAdapter.setOnMusicItemLongClickListener(musicItem -> {
+            showAddToCollectionBottomSheet(musicItem);
+            return true;
+        });
+    }
+
+    // Add these methods for collection functionality
+    private void showAddToCollectionBottomSheet(MusicItem musicItem) {
+        if (getContext() == null || musicItem == null) {
+            return;
+        }
+
+        List<Collection> collections = collectionManager.getAllCollections();
+
+        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(requireContext());
+        View view = LayoutInflater.from(requireContext()).inflate(
+                R.layout.bottom_sheet_add_to_collection,
+                null
+        );
+
+        RecyclerView collectionsRecyclerView = view.findViewById(R.id.collectionsRecyclerView);
+        android.widget.TextView emptyCollectionsText = view.findViewById(R.id.emptyCollectionsText);
+        MaterialButton createNewCollectionButton = view.findViewById(R.id.createNewCollectionButton);
+
+        collectionsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+
+        if (collections.isEmpty()) {
+            collectionsRecyclerView.setVisibility(View.GONE);
+            emptyCollectionsText.setVisibility(View.VISIBLE);
+        } else {
+            collectionsRecyclerView.setVisibility(View.VISIBLE);
+            emptyCollectionsText.setVisibility(View.GONE);
+
+            AddToCollectionAdapter adapter = new AddToCollectionAdapter(
+                    collections,
+                    musicItem.getId(),
+                    collectionManager,
+                    collection -> {
+                        boolean added = collectionManager.addSongToCollection(
+                                collection.getId(),
+                                musicItem.getId()
+                        );
+                        if (added) {
+                            Toast.makeText(requireContext(),
+                                    "Added to " + collection.getName(),
+                                    Toast.LENGTH_SHORT).show();
+                            broadcastCollectionChange(ACTION_SONG_ADDED_TO_COLLECTION);
+                            bottomSheetDialog.dismiss();
+                        } else {
+                            Toast.makeText(requireContext(),
+                                    "Song already in " + collection.getName(),
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    }
+            );
+            collectionsRecyclerView.setAdapter(adapter);
+        }
+
+        createNewCollectionButton.setOnClickListener(v -> {
+            bottomSheetDialog.dismiss();
+            showCreateCollectionDialog(musicItem);
+        });
+
+        bottomSheetDialog.setContentView(view);
+        bottomSheetDialog.show();
+    }
+
+    private void showCreateCollectionDialog(MusicItem musicItem) {
+        if (getContext() == null) {
+            return;
+        }
+
+        View dialogView = LayoutInflater.from(requireContext())
+                .inflate(R.layout.dialog_add_collection, null);
+
+        TextInputEditText editTextName = dialogView.findViewById(R.id.editTextCollectionName);
+
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("New Collection")
+                .setView(dialogView)
+                .setPositiveButton("Create", (dialog, which) -> {
+                    String collectionName = editTextName.getText().toString().trim();
+                    if (!collectionName.isEmpty()) {
+                        createCollectionAndAddSong(collectionName, musicItem);
+                    } else {
+                        Toast.makeText(requireContext(),
+                                "Collection name cannot be empty",
+                                Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void createCollectionAndAddSong(String collectionName, MusicItem musicItem) {
+        if (getContext() == null || musicItem == null) {
+            return;
+        }
+
+        // Check for duplicate names
+        List<Collection> existingCollections = collectionManager.getAllCollections();
+        for (Collection collection : existingCollections) {
+            if (collection.getName().equalsIgnoreCase(collectionName)) {
+                Toast.makeText(requireContext(),
+                        "Collection already exists",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+
+        // Create new collection
+        Collection newCollection = collectionManager.createCollection(collectionName);
+
+        // Add current song to the new collection
+        boolean added = collectionManager.addSongToCollection(
+                newCollection.getId(),
+                musicItem.getId()
+        );
+
+        if (added) {
+            Toast.makeText(requireContext(),
+                    "Created \"" + collectionName + "\" and added song",
+                    Toast.LENGTH_SHORT).show();
+            broadcastCollectionChange(ACTION_COLLECTION_CREATED);
+        } else {
+            Toast.makeText(requireContext(),
+                    "Collection created",
+                    Toast.LENGTH_SHORT).show();
+            broadcastCollectionChange(ACTION_COLLECTION_CREATED);
+        }
+    }
+
+    private void broadcastCollectionChange(String action) {
+        if (getContext() == null) {
+            return;
+        }
+
+        try {
+            Intent intent = new Intent(action);
+            intent.setPackage(requireContext().getPackageName());
+            requireContext().sendBroadcast(intent);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private void loadMusicData() {

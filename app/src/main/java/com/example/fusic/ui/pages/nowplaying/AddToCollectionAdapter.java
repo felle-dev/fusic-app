@@ -73,7 +73,6 @@ public class AddToCollectionAdapter extends RecyclerView.Adapter<AddToCollection
             int count = collection.getSongCount();
             songCount.setText(count + (count == 1 ? " song" : " songs"));
 
-            // Check if current song is already in this collection
             boolean isInCollection = collectionManager.isSongInCollection(
                     collection.getId(), currentSongId);
 

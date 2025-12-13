@@ -1010,6 +1010,74 @@ public class MusicService extends Service implements
         }
     }
 
+    /**
+     * Move a queue item from one position to another
+     * @param fromPosition Original position of the item (in upcoming queue, not absolute playlist position)
+     * @param toPosition Target position for the item (in upcoming queue, not absolute playlist position)
+     */
+    public void moveQueueItem(int fromPosition, int toPosition) {
+        if (playlist == null || fromPosition < 0 || toPosition < 0) {
+            return;
+        }
+
+        int absoluteFromPos = currentIndex + 1 + fromPosition;
+        int absoluteToPos = currentIndex + 1 + toPosition;
+
+        if (absoluteFromPos >= playlist.size() || absoluteToPos >= playlist.size() ||
+                absoluteFromPos <= currentIndex || absoluteToPos <= currentIndex) {
+            return;
+        }
+
+        MusicItem item = playlist.remove(absoluteFromPos);
+        playlist.add(absoluteToPos, item);
+
+        if (!isShuffleEnabled && !originalPlaylist.isEmpty()) {
+            for (int i = 0; i < originalPlaylist.size(); i++) {
+                if (originalPlaylist.get(i).getId() == item.getId()) {
+                    originalPlaylist.remove(i);
+                    int originalInsertPos = Math.min(absoluteToPos, originalPlaylist.size());
+                    originalPlaylist.add(originalInsertPos, item);
+                    break;
+                }
+            }
+        }
+
+        Log.d(TAG, "Queue item moved from position " + fromPosition + " to " + toPosition +
+                " (absolute: " + absoluteFromPos + " to " + absoluteToPos + ")");
+    }
+
+    /**
+     * Remove an item from the queue
+     * @param position Position in the upcoming queue (not absolute playlist position)
+     */
+    public void removeQueueItem(int position) {
+        if (playlist == null || position < 0) {
+            return;
+        }
+
+        int absolutePos = currentIndex + 1 + position;
+
+        if (absolutePos >= playlist.size() || absolutePos <= currentIndex) {
+            return;
+        }
+
+        MusicItem itemToRemove = playlist.get(absolutePos);
+
+        playlist.remove(absolutePos);
+
+        if (!originalPlaylist.isEmpty()) {
+            for (int i = 0; i < originalPlaylist.size(); i++) {
+                if (originalPlaylist.get(i).getId() == itemToRemove.getId()) {
+                    originalPlaylist.remove(i);
+                    break;
+                }
+            }
+        }
+
+        Log.d(TAG, "Queue item removed at position " + position +
+                " (absolute: " + absolutePos + ") - " + itemToRemove.getTitle());
+    }
+
     @Override
     public IBinder onBind(Intent intent) {
         return new MusicBinder();

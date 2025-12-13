@@ -92,6 +92,31 @@ public class CollectionManager {
     }
 
     /**
+     * Update an existing collection (including music IDs order)
+     * Used when reordering songs in a collection via drag-and-drop
+     * @param collection The collection to update with new order
+     * @return true if successful, false otherwise
+     */
+    public boolean updateCollection(Collection collection) {
+        if (collection == null) {
+            return false;
+        }
+
+        List<Collection> collections = getAllCollections();
+
+        for (int i = 0; i < collections.size(); i++) {
+            if (collections.get(i).getId() == collection.getId()) {
+                // Replace the collection at this position with the updated one
+                collections.set(i, collection);
+                saveCollections(collections);
+                return true;
+            }
+        }
+
+        return false; // Collection not found
+    }
+
+    /**
      * Check if a song is in a collection
      */
     public boolean isSongInCollection(long collectionId, long musicId) {
@@ -164,6 +189,9 @@ public class CollectionManager {
         return false;
     }
 
+    /**
+     * Save collections to SharedPreferences
+     */
     private void saveCollections(List<Collection> collections) {
         String json = gson.toJson(collections);
         preferences.edit().putString(KEY_COLLECTIONS, json).apply();

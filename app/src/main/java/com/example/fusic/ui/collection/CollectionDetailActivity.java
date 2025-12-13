@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.graphics.Canvas;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Parcelable;
@@ -23,6 +24,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -37,6 +39,7 @@ import com.example.fusic.ui.music.MusicAdapter;
 import com.example.fusic.ui.music.MusicItem;
 import com.example.fusic.ui.pages.nowplaying.NowPlayingActivity;
 import com.example.fusic.service.MusicService;
+import com.google.android.material.snackbar.Snackbar;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -331,8 +334,6 @@ public class CollectionDetailActivity extends AppCompatActivity {
         try {
             collectionNameTextView.setText(collection.getName());
 
-            // Use a placeholder image for collections
-            collectionImageView.setImageResource(R.drawable.ic_outline_queue_music_24);
         } catch (Exception e) {
             Log.e(TAG, "Error setting up collection header: " + e.getMessage(), e);
         }
@@ -355,8 +356,216 @@ public class CollectionDetailActivity extends AppCompatActivity {
                     startMusicService(musicItem);
                 }
             });
+
+            // Attach ItemTouchHelper for drag and swipe functionality
+            ItemTouchHelper itemTouchHelper = new ItemTouchHelper(new CollectionItemTouchHelperCallback());
+            itemTouchHelper.attachToRecyclerView(songsRecyclerView);
+
         } catch (Exception e) {
             Log.e(TAG, "Error setting up RecyclerView: " + e.getMessage(), e);
+        }
+    }
+
+    // Add this inner class to CollectionDetailActivity for handling drag and swipe gestures:
+    private class CollectionItemTouchHelperCallback extends ItemTouchHelper.Callback {
+
+        private int dragFrom = -1;
+        private int dragTo = -1;
+
+        @Override
+        public boolean isLongPressDragEnabled() {
+            return true;
+        }
+
+        @Override
+        public boolean isItemViewSwipeEnabled() {
+            return true;
+        }
+
+        @Override
+        public int getMovementFlags(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder) {
+            int dragFlags = ItemTouchHelper.UP | ItemTouchHelper.DOWN;
+            int swipeFlags = ItemTouchHelper.START | ItemTouchHelper.END;
+            return makeMovementFlags(dragFlags, swipeFlags);
+        }
+
+        @Override
+        public boolean onMove(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder,
+                              RecyclerView.ViewHolder target) {
+            int fromPosition = viewHolder.getAdapterPosition();
+            int toPosition = target.getAdapterPosition();
+
+            if (dragFrom == -1) {
+                dragFrom = fromPosition;
+            }
+            dragTo = toPosition;
+
+            // Move in the list
+            if (fromPosition < toPosition) {
+                for (int i = fromPosition; i < toPosition; i++) {
+                    java.util.Collections.swap(collectionSongs, i, i + 1);
+                }
+            } else {
+                for (int i = fromPosition; i > toPosition; i--) {
+                    java.util.Collections.swap(collectionSongs, i, i - 1);
+                }
+            }
+
+            if (musicAdapter != null) {
+                musicAdapter.notifyItemMoved(fromPosition, toPosition);
+            }
+
+            return true;
+        }
+
+        @Override
+        public void onSwiped(RecyclerView.ViewHolder viewHolder, int direction) {
+            int position = viewHolder.getAdapterPosition();
+            if (position >= 0 && position < collectionSongs.size()) {
+                MusicItem removedItem = collectionSongs.get(position);
+
+                // Remove from the list
+                collectionSongs.remove(position);
+                if (musicAdapter != null) {
+                    musicAdapter.notifyItemRemoved(position);
+                }
+
+                // Remove from collection in database
+                boolean removed = collectionManager.removeSongFromCollection(
+                        collection.getId(),
+                        removedItem.getId()
+                );
+
+                if (removed) {
+                    // Update song count
+                    songCountTextView.setText(collectionSongs.size() + " songs");
+
+                    // Update UI if collection is now empty
+                    if (collectionSongs.isEmpty()) {
+                        updateUI();
+                    }
+
+                    // Show snackbar with undo option
+                    Snackbar snackbar = Snackbar.make(
+                            songsRecyclerView,
+                            "Removed from collection",
+                            Snackbar.LENGTH_LONG
+                    );
+
+                    snackbar.setAction("UNDO", v -> {
+                        // Re-add to collection
+                        boolean added = collectionManager.addSongToCollection(
+                                collection.getId(),
+                                removedItem.getId()
+                        );
+
+                        if (added) {
+                            collectionSongs.add(position, removedItem);
+                            if (musicAdapter != null) {
+                                musicAdapter.notifyItemInserted(position);
+                            }
+                            songCountTextView.setText(collectionSongs.size() + " songs");
+                            updateUI();
+
+                            // Broadcast collection change
+                            broadcastCollectionChange();
+                        }
+                    });
+
+                    snackbar.show();
+
+                    // Broadcast collection change
+                    broadcastCollectionChange();
+                } else {
+                    Toast.makeText(
+                            CollectionDetailActivity.this,
+                            "Failed to remove song",
+                            Toast.LENGTH_SHORT
+                    ).show();
+
+                    // Re-add to list if database removal failed
+                    collectionSongs.add(position, removedItem);
+                    if (musicAdapter != null) {
+                        musicAdapter.notifyItemInserted(position);
+                    }
+                }
+            }
+        }
+
+        @Override
+        public void onSelectedChanged(RecyclerView.ViewHolder viewHolder, int actionState) {
+            super.onSelectedChanged(viewHolder, actionState);
+
+            if (actionState == ItemTouchHelper.ACTION_STATE_DRAG && viewHolder != null) {
+                viewHolder.itemView.setAlpha(0.7f);
+                viewHolder.itemView.setScaleX(1.05f);
+                viewHolder.itemView.setScaleY(1.05f);
+                viewHolder.itemView.setElevation(8f);
+            }
+        }
+
+        @Override
+        public void clearView(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder) {
+            super.clearView(recyclerView, viewHolder);
+
+            viewHolder.itemView.setAlpha(1.0f);
+            viewHolder.itemView.setScaleX(1.0f);
+            viewHolder.itemView.setScaleY(1.0f);
+            viewHolder.itemView.setElevation(0f);
+
+            // If item was dragged, update the collection order in database
+            if (dragFrom != -1 && dragTo != -1 && dragFrom != dragTo) {
+                updateCollectionOrder();
+            }
+
+            dragFrom = -1;
+            dragTo = -1;
+        }
+
+        @Override
+        public void onChildDraw(Canvas c, RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder,
+                                float dX, float dY, int actionState, boolean isCurrentlyActive) {
+            if (actionState == ItemTouchHelper.ACTION_STATE_SWIPE) {
+                // Add fade-out effect while swiping
+                final float alpha = 1.0f - Math.abs(dX) / (float) viewHolder.itemView.getWidth();
+                viewHolder.itemView.setAlpha(alpha);
+                viewHolder.itemView.setTranslationX(dX);
+            } else {
+                super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive);
+            }
+        }
+    }
+
+    private void updateCollectionOrder() {
+        if (collectionSongs == null || collectionSongs.isEmpty()) {
+            return;
+        }
+
+        try {
+            // Get the new order of music IDs
+            List<Long> newOrder = new ArrayList<>();
+            for (MusicItem item : collectionSongs) {
+                newOrder.add(item.getId());
+            }
+
+            // Update the collection with new order
+            collection.setMusicIds(newOrder);
+            collectionManager.updateCollection(collection);
+
+            Log.d(TAG, "Collection order updated");
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating collection order: " + e.getMessage(), e);
+        }
+    }
+
+    private void broadcastCollectionChange() {
+        try {
+            Intent intent = new Intent("com.example.fusic.COLLECTION_CHANGED");
+            intent.setPackage(getPackageName());
+            sendBroadcast(intent);
+            Log.d(TAG, "Broadcast sent: Collection changed");
+        } catch (Exception e) {
+            Log.e(TAG, "Error broadcasting collection change: " + e.getMessage(), e);
         }
     }
 
