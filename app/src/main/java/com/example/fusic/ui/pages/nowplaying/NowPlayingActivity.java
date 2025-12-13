@@ -57,6 +57,12 @@ public class NowPlayingActivity extends AppCompatActivity {
 
     private static final String LYRICS_PREFS = "LyricsPreferences";
 
+    // Broadcast action constants - must match CollectionFragment
+    private static final String ACTION_COLLECTION_CHANGED = "com.example.fusic.COLLECTION_CHANGED";
+    private static final String ACTION_COLLECTION_CREATED = "com.example.fusic.COLLECTION_CREATED";
+    private static final String ACTION_SONG_ADDED_TO_COLLECTION = "com.example.fusic.SONG_ADDED_TO_COLLECTION";
+    private static final String ACTION_SONG_REMOVED_FROM_COLLECTION = "com.example.fusic.SONG_REMOVED_FROM_COLLECTION";
+
     private ActivityNowPlayingBinding binding;
     private MusicService musicService;
     private boolean serviceBound = false;
@@ -170,6 +176,20 @@ public class NowPlayingActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Broadcast collection changes to update CollectionFragment
+     */
+    private void broadcastCollectionChange(String action) {
+        try {
+            Intent intent = new Intent(action);
+            intent.setPackage(getPackageName());
+            sendBroadcast(intent);
+            Log.d("NowPlayingActivity", "Broadcast sent: " + action);
+        } catch (Exception e) {
+            Log.e("NowPlayingActivity", "Error broadcasting collection change: " + e.getMessage(), e);
+        }
+    }
+
     private void updateUIFromService() {
         if (musicService != null) {
             MusicItem serviceSong = musicService.getCurrentSong();
@@ -259,7 +279,6 @@ public class NowPlayingActivity extends AppCompatActivity {
         }
 
         loadAlbumArt();
-
     }
 
     private void loadAlbumArt() {
@@ -272,14 +291,7 @@ public class NowPlayingActivity extends AppCompatActivity {
                     @Override
                     public void onResourceReady(Bitmap bitmap, Transition<? super Bitmap> transition) {
                         binding.albumArt.setImageBitmap(bitmap);
-
                         applyBlurredBackground(bitmap);
-
-//                        Palette.from(bitmap).generate(palette -> {
-//                            if (palette != null) {
-//                                applyDynamicColors(palette);
-//                            }
-//                        });
                     }
 
                     @Override
@@ -294,7 +306,6 @@ public class NowPlayingActivity extends AppCompatActivity {
         try {
             Bitmap blurredBitmap = blurBitmap(originalBitmap, 25f);
             binding.blurredBackground.setImageBitmap(blurredBitmap);
-
         } catch (Exception e) {
             Log.e("NowPlayingActivity", "Error applying blur effect: " + e.getMessage(), e);
             binding.blurredBackground.setImageBitmap(originalBitmap);
@@ -304,27 +315,21 @@ public class NowPlayingActivity extends AppCompatActivity {
 
     private Bitmap blurBitmap(Bitmap bitmap, float radius) {
         Bitmap outputBitmap = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), bitmap.getConfig());
-
         RenderScript rs = RenderScript.create(this);
 
         try {
             ScriptIntrinsicBlur blurScript = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
-
             Allocation inputAllocation = Allocation.createFromBitmap(rs, bitmap);
             Allocation outputAllocation = Allocation.createFromBitmap(rs, outputBitmap);
 
             blurScript.setRadius(Math.min(25f, Math.max(1f, radius)));
-
             blurScript.setInput(inputAllocation);
-
             blurScript.forEach(outputAllocation);
-
             outputAllocation.copyTo(outputBitmap);
 
             inputAllocation.destroy();
             outputAllocation.destroy();
             blurScript.destroy();
-
         } catch (Exception e) {
             Log.e("NowPlayingActivity", "RenderScript blur failed: " + e.getMessage(), e);
             return bitmap;
@@ -335,48 +340,10 @@ public class NowPlayingActivity extends AppCompatActivity {
         return outputBitmap;
     }
 
-    private void applyDynamicColors(Palette palette) {
-        int primaryColor = MaterialColors.getColor(this, com.google.android.material.R.attr.colorPrimaryContainer, 0);
-        int surfaceColor = MaterialColors.getColor(this, com.google.android.material.R.attr.colorSurface, 0);
-
-        Palette.Swatch vibrantSwatch = palette.getVibrantSwatch();
-        Palette.Swatch dominantSwatch = palette.getDominantSwatch();
-
-        int accentColor = primaryColor;
-        if (vibrantSwatch != null) {
-            accentColor = vibrantSwatch.getRgb();
-        } else if (dominantSwatch != null) {
-            accentColor = dominantSwatch.getRgb();
-        }
-
-        int whiteColor = Color.WHITE;
-        int blackColor = Color.BLACK;
-
-        binding.seekBar.setIndicatorColor(accentColor);
-        binding.seekBar.setTrackColor(MaterialColors.getColor(this, com.google.android.material.R.attr.colorOutlineVariant, 0));
-
-        // Apply colors to buttons
-        binding.playPauseButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(accentColor));
-        binding.playPauseButton.setTextColor(whiteColor);
-
-        binding.previousButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(accentColor));
-        binding.previousButton.setCompoundDrawableTintList(android.content.res.ColorStateList.valueOf(whiteColor));
-
-        binding.nextButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(accentColor));
-        binding.nextButton.setCompoundDrawableTintList(android.content.res.ColorStateList.valueOf(whiteColor));
-
-        binding.shuffleButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(accentColor));
-        binding.shuffleButton.setCompoundDrawableTintList(android.content.res.ColorStateList.valueOf(whiteColor));
-
-        binding.repeatButton.setBackgroundTintList(android.content.res.ColorStateList.valueOf(accentColor));
-        binding.repeatButton.setCompoundDrawableTintList(android.content.res.ColorStateList.valueOf(whiteColor));
-    }
-
     private void setupClickListeners() {
         binding.playPauseButton.setOnClickListener(v -> togglePlayPause());
         binding.previousButton.setOnClickListener(v -> playPrevious());
         binding.nextButton.setOnClickListener(v -> playNext());
-
         binding.shuffleButton.setOnClickListener(v -> toggleShuffle());
         binding.repeatButton.setOnClickListener(v -> toggleRepeat());
         binding.addToCollection.setOnClickListener(v -> showAddToCollectionBottomSheet());
@@ -401,7 +368,6 @@ public class NowPlayingActivity extends AppCompatActivity {
 
         collectionsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
 
-        // Show/hide empty state
         if (collections.isEmpty()) {
             collectionsRecyclerView.setVisibility(View.GONE);
             emptyCollectionsText.setVisibility(View.VISIBLE);
@@ -414,10 +380,11 @@ public class NowPlayingActivity extends AppCompatActivity {
                     currentSong.getId(),
                     collectionManager,
                     collection -> {
-                        // Handle collection click
                         boolean added = collectionManager.addSongToCollection(collection.getId(), currentSong.getId());
                         if (added) {
                             Toast.makeText(this, "Added to " + collection.getName(), Toast.LENGTH_SHORT).show();
+                            // Broadcast that a song was added to collection
+                            broadcastCollectionChange(ACTION_SONG_ADDED_TO_COLLECTION);
                             bottomSheetDialog.dismiss();
                         } else {
                             Toast.makeText(this, "Song already in " + collection.getName(), Toast.LENGTH_SHORT).show();
@@ -427,7 +394,6 @@ public class NowPlayingActivity extends AppCompatActivity {
             collectionsRecyclerView.setAdapter(adapter);
         }
 
-        // Create new collection button
         createNewCollectionButton.setOnClickListener(v -> {
             bottomSheetDialog.dismiss();
             showCreateCollectionDialog();
@@ -482,11 +448,14 @@ public class NowPlayingActivity extends AppCompatActivity {
         if (added) {
             Toast.makeText(this, "Created \"" + collectionName + "\" and added song",
                     Toast.LENGTH_SHORT).show();
+            // Broadcast that a new collection was created
+            broadcastCollectionChange(ACTION_COLLECTION_CREATED);
         } else {
             Toast.makeText(this, "Collection created", Toast.LENGTH_SHORT).show();
+            // Still broadcast collection creation even if song wasn't added
+            broadcastCollectionChange(ACTION_COLLECTION_CREATED);
         }
     }
-
 
     private void showQueueBottomSheet() {
         BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(this);
@@ -499,7 +468,6 @@ public class NowPlayingActivity extends AppCompatActivity {
 
         List<MusicItem> queueList = getUpcomingQueue();
 
-        // Show/hide empty state
         if (queueList.isEmpty()) {
             queueRecyclerView.setVisibility(View.GONE);
             emptyQueueText.setVisibility(View.VISIBLE);
@@ -515,24 +483,6 @@ public class NowPlayingActivity extends AppCompatActivity {
         bottomSheetDialog.show();
     }
 
-    private String getLyricsForCurrentSong() {
-        if (currentSong == null) return null;
-
-        android.content.SharedPreferences prefs = getSharedPreferences(LYRICS_PREFS, Context.MODE_PRIVATE);
-        String key = "lyrics_" + currentSong.getId();
-        return prefs.getString(key, null);
-    }
-
-    private void saveLyricsForCurrentSong(String lyrics) {
-        if (currentSong == null) return;
-
-        android.content.SharedPreferences prefs = getSharedPreferences(LYRICS_PREFS, Context.MODE_PRIVATE);
-        android.content.SharedPreferences.Editor editor = prefs.edit();
-        String key = "lyrics_" + currentSong.getId();
-        editor.putString(key, lyrics);
-        editor.apply();
-    }
-
     private List<MusicItem> getUpcomingQueue() {
         if (musicService != null) {
             return musicService.getUpcomingQueue();
@@ -545,7 +495,6 @@ public class NowPlayingActivity extends AppCompatActivity {
             MediaPlayer mediaPlayer = musicService.getMediaPlayer();
 
             float progressPercent = Math.max(0, Math.min(1, adjustedX / usableWidth));
-
             int newProgress = (int) (progressPercent * 100);
             binding.seekBar.setProgress(newProgress);
 
@@ -657,6 +606,7 @@ public class NowPlayingActivity extends AppCompatActivity {
             }
         }
     }
+
     private void startSeekBarUpdates() {
         stopSeekBarUpdates();
 
@@ -720,7 +670,6 @@ public class NowPlayingActivity extends AppCompatActivity {
         }
     }
 
-    // Queue Adapter for RecyclerView
     private static class QueueAdapter extends RecyclerView.Adapter<QueueAdapter.QueueViewHolder> {
 
         private List<MusicItem> queueList;
@@ -765,21 +714,16 @@ public class NowPlayingActivity extends AppCompatActivity {
             }
 
             void bind(MusicItem item, int position) {
-                // Set position number (starting from 1)
                 queuePosition.setText(String.valueOf(position + 1));
-
-                // Set song title and artist
                 queueSongTitle.setText(item.getTitle());
                 queueSongArtist.setText(item.getArtist());
 
-                // Format and set duration
                 long duration = item.getDuration();
                 long minutes = TimeUnit.MILLISECONDS.toMinutes(duration);
                 long seconds = TimeUnit.MILLISECONDS.toSeconds(duration) - TimeUnit.MINUTES.toSeconds(minutes);
                 String formattedDuration = String.format("%d:%02d", minutes, seconds);
                 queueSongDuration.setText(formattedDuration);
 
-                // Load album art with Glide
                 Glide.with(itemView.getContext())
                         .load(item.getAlbumArtUri())
                         .placeholder(R.drawable.ic_outline_music_note_24)

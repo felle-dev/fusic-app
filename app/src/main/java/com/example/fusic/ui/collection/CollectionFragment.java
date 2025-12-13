@@ -1,7 +1,9 @@
 package com.example.fusic.ui.collection;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -41,6 +43,33 @@ public class CollectionFragment extends Fragment {
     private static final String KEY_COLLECTIONS = "collections";
     private Gson gson;
 
+    // Broadcast action constants
+    public static final String ACTION_COLLECTION_CHANGED = "com.example.fusic.COLLECTION_CHANGED";
+    public static final String ACTION_COLLECTION_CREATED = "com.example.fusic.COLLECTION_CREATED";
+    public static final String ACTION_SONG_ADDED_TO_COLLECTION = "com.example.fusic.SONG_ADDED_TO_COLLECTION";
+    public static final String ACTION_SONG_REMOVED_FROM_COLLECTION = "com.example.fusic.SONG_REMOVED_FROM_COLLECTION";
+
+    private boolean isReceiverRegistered = false;
+
+    private final BroadcastReceiver collectionUpdateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent == null || intent.getAction() == null) return;
+
+            String action = intent.getAction();
+
+            // Reload collection data whenever any collection-related action occurs
+            if (ACTION_COLLECTION_CHANGED.equals(action) ||
+                    ACTION_COLLECTION_CREATED.equals(action) ||
+                    ACTION_SONG_ADDED_TO_COLLECTION.equals(action) ||
+                    ACTION_SONG_REMOVED_FROM_COLLECTION.equals(action)) {
+
+                // Reload collections from storage
+                refreshCollections();
+            }
+        }
+    };
+
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
         CollectionViewModel collectionViewModel =
@@ -57,7 +86,64 @@ public class CollectionFragment extends Fragment {
         setupAddButtons();
         loadCollectionData();
 
+        // Register broadcast receiver
+        registerCollectionUpdateReceiver();
+
         return root;
+    }
+
+    private void registerCollectionUpdateReceiver() {
+        if (!isReceiverRegistered && getActivity() != null) {
+            try {
+                IntentFilter filter = new IntentFilter();
+                filter.addAction(ACTION_COLLECTION_CHANGED);
+                filter.addAction(ACTION_COLLECTION_CREATED);
+                filter.addAction(ACTION_SONG_ADDED_TO_COLLECTION);
+                filter.addAction(ACTION_SONG_REMOVED_FROM_COLLECTION);
+
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    getActivity().registerReceiver(collectionUpdateReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+                } else {
+                    getActivity().registerReceiver(collectionUpdateReceiver, filter);
+                }
+
+                isReceiverRegistered = true;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void unregisterCollectionUpdateReceiver() {
+        if (isReceiverRegistered && getActivity() != null) {
+            try {
+                getActivity().unregisterReceiver(collectionUpdateReceiver);
+                isReceiverRegistered = false;
+            } catch (IllegalArgumentException e) {
+                // Receiver not registered
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void refreshCollections() {
+        if (binding == null || executorService == null || executorService.isShutdown()) {
+            return;
+        }
+
+        executorService.execute(() -> {
+            List<Collection> collections = loadCollections();
+
+            if (getActivity() != null) {
+                requireActivity().runOnUiThread(() -> {
+                    if (binding != null && adapter != null) {
+                        adapter.updateCollections(collections);
+                        updateEmptyState(collections.isEmpty());
+                    }
+                });
+            }
+        });
     }
 
     private void setupRecyclerView() {
@@ -139,6 +225,9 @@ public class CollectionFragment extends Fragment {
                 adapter.updateCollections(collections);
                 updateEmptyState(collections.isEmpty());
                 Toast.makeText(requireContext(), "Collection created", Toast.LENGTH_SHORT).show();
+
+                // Broadcast collection created
+                broadcastCollectionChange(ACTION_COLLECTION_CREATED);
             });
         });
     }
@@ -168,6 +257,9 @@ public class CollectionFragment extends Fragment {
                 adapter.updateCollections(collections);
                 updateEmptyState(collections.isEmpty());
                 Toast.makeText(requireContext(), "Collection deleted", Toast.LENGTH_SHORT).show();
+
+                // Broadcast collection changed
+                broadcastCollectionChange(ACTION_COLLECTION_CHANGED);
             });
         });
     }
@@ -178,11 +270,15 @@ public class CollectionFragment extends Fragment {
         executorService.execute(() -> {
             List<Collection> collections = loadCollections();
 
-            requireActivity().runOnUiThread(() -> {
-                showLoading(false);
-                adapter.updateCollections(collections);
-                updateEmptyState(collections.isEmpty());
-            });
+            if (getActivity() != null) {
+                requireActivity().runOnUiThread(() -> {
+                    showLoading(false);
+                    if (adapter != null) {
+                        adapter.updateCollections(collections);
+                    }
+                    updateEmptyState(collections.isEmpty());
+                });
+            }
         });
     }
 
@@ -198,6 +294,18 @@ public class CollectionFragment extends Fragment {
     private void saveCollections(List<Collection> collections) {
         String json = gson.toJson(collections);
         preferences.edit().putString(KEY_COLLECTIONS, json).apply();
+    }
+
+    private void broadcastCollectionChange(String action) {
+        if (getContext() == null) return;
+
+        try {
+            Intent intent = new Intent(action);
+            intent.setPackage(getContext().getPackageName());
+            getContext().sendBroadcast(intent);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private void updateEmptyState(boolean isEmpty) {
@@ -225,8 +333,24 @@ public class CollectionFragment extends Fragment {
     }
 
     @Override
+    public void onResume() {
+        super.onResume();
+        // Refresh collections when fragment becomes visible
+        refreshCollections();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+    }
+
+    @Override
     public void onDestroyView() {
         super.onDestroyView();
+
+        // Unregister receiver
+        unregisterCollectionUpdateReceiver();
+
         if (executorService != null && !executorService.isShutdown()) {
             executorService.shutdown();
         }

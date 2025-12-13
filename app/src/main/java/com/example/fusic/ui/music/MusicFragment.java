@@ -343,10 +343,10 @@ public class MusicFragment extends Fragment {
                 int newCount = tempMusicList.size();
                 if (newCount > 0) {
                     if (previousSize == 0) {
-                        // First load
-                        Toast.makeText(getContext(),
-                                "Loaded " + newCount + " songs",
-                                Toast.LENGTH_SHORT).show();
+//                        // First load
+//                        Toast.makeText(getContext(),
+//                                "Loaded " + newCount + " songs",
+//                                Toast.LENGTH_SHORT).show();
                     } else if (newCount == previousSize) {
                         // Refresh with same count
                         Toast.makeText(getContext(),

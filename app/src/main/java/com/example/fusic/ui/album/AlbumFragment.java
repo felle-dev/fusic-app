@@ -393,9 +393,9 @@ public class AlbumFragment extends Fragment {
                 int newCount = tempAlbumList.size();
                 if (newCount > 0) {
                     if (previousSize == 0) {
-                        Toast.makeText(getContext(),
-                                "Loaded " + newCount + " albums",
-                                Toast.LENGTH_SHORT).show();
+//                        Toast.makeText(getContext(),
+//                                "Loaded " + newCount + " albums",
+//                                Toast.LENGTH_SHORT).show();
                     } else if (newCount == previousSize) {
                         Toast.makeText(getContext(),
                                 "Album library is up to date (" + newCount + " albums)",
