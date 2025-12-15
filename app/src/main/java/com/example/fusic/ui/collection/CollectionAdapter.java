@@ -114,7 +114,6 @@ public class CollectionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
     @Override
     public int getItemCount() {
-        // Collections + 1 for the add button (only show button if there are collections)
         return collections.isEmpty() ? 0 : collections.size() + 1;
     }
 
@@ -151,7 +150,6 @@ public class CollectionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                 }
             });
 
-            // Long click - Show options menu
             cardView.setOnLongClickListener(v -> {
                 if (longClickListener != null) {
                     longClickListener.onCollectionLongClick(collection);

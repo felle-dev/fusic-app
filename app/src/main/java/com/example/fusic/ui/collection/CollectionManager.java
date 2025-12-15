@@ -47,16 +47,15 @@ public class CollectionManager {
 
         for (Collection collection : collections) {
             if (collection.getId() == collectionId) {
-                // Check if song already exists
                 if (!collection.getMusicIds().contains(musicId)) {
                     collection.getMusicIds().add(musicId);
                     saveCollections(collections);
                     return true;
                 }
-                return false; // Song already in collection
+                return false;
             }
         }
-        return false; // Collection not found
+        return false;
     }
 
     /**
@@ -106,14 +105,13 @@ public class CollectionManager {
 
         for (int i = 0; i < collections.size(); i++) {
             if (collections.get(i).getId() == collection.getId()) {
-                // Replace the collection at this position with the updated one
                 collections.set(i, collection);
                 saveCollections(collections);
                 return true;
             }
         }
 
-        return false; // Collection not found
+        return false;
     }
 
     /**

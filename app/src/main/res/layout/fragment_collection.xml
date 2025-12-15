@@ -9,7 +9,6 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <!-- Main RecyclerView (now includes the add button as last item) -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/collectionRecyclerView"
             android:layout_width="0dp"
@@ -23,7 +22,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
-        <!-- Loading state -->
         <LinearLayout
             android:id="@+id/loadingLayout"
             android:layout_width="wrap_content"
@@ -50,7 +48,6 @@
                 android:textSize="16sp" />
         </LinearLayout>
 
-        <!-- Empty state (shown only when no collections) -->
         <LinearLayout
             android:id="@+id/emptyState"
             android:layout_width="wrap_content"

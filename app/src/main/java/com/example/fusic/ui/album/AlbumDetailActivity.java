@@ -200,28 +200,22 @@ public class AlbumDetailActivity extends AppCompatActivity {
                 return;
             }
 
-            // Pick a random song to start with
             Random random = new Random();
             int randomIndex = random.nextInt(albumSongs.size());
             MusicItem randomSong = albumSongs.get(randomIndex);
 
-            // Set the playlist with the random song as starting point
             Intent playlistIntent = new Intent(this, MusicService.class);
             playlistIntent.setAction(MusicService.ACTION_SET_PLAYLIST);
             playlistIntent.putParcelableArrayListExtra("playlist", new ArrayList<>(albumSongs));
             playlistIntent.putExtra("start_index", randomIndex);
             startService(playlistIntent);
 
-            // Small delay to ensure playlist is set
             new android.os.Handler().postDelayed(() -> {
-                // Enable shuffle mode
                 Intent shuffleIntent = new Intent(this, MusicService.class);
                 shuffleIntent.setAction(MusicService.ACTION_TOGGLE_SHUFFLE);
                 startService(shuffleIntent);
 
-                // Another small delay to ensure shuffle is complete
                 new android.os.Handler().postDelayed(() -> {
-                    // Play the random song
                     Intent playIntent = new Intent(this, MusicService.class);
                     playIntent.setAction(MusicService.ACTION_PLAY);
                     playIntent.putExtra("music_item", randomSong);

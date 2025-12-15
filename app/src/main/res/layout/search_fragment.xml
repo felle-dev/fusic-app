@@ -9,7 +9,6 @@
     android:paddingTop="48dp"
     tools:context=".ui.pages.search.SearchFragment">
 
-    <!-- Search Input -->
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -63,13 +62,11 @@
 
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- Content Area -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <!-- Initial State -->
         <LinearLayout
             android:id="@+id/initial_state"
             android:layout_width="match_parent"
@@ -105,7 +102,6 @@
 
         </LinearLayout>
 
-        <!-- Loading Indicator -->
         <LinearLayout
             android:id="@+id/loading_indicator"
             android:layout_width="match_parent"
@@ -130,7 +126,6 @@
 
         </LinearLayout>
 
-        <!-- Search Results -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/search_recycler_view"
             android:layout_width="match_parent"
@@ -141,7 +136,6 @@
             android:visibility="gone"
             tools:listitem="@layout/item_music" />
 
-        <!-- Empty State -->
         <LinearLayout
             android:id="@+id/empty_state"
             android:layout_width="match_parent"

@@ -310,18 +310,6 @@ public class ArtistDetailActivity extends AppCompatActivity {
     private void setupArtistHeader() {
         try {
             artistNameTextView.setText(artistItem.getArtistName());
-
-//            if (artistItem.getArtistImageUri() != null) {
-//                Glide.with(this)
-//                        .load(artistItem.getArtistImageUri())
-//                        .apply(new RequestOptions()
-//                                .placeholder(R.drawable.ic_outline_person_24)
-//                                .error(R.drawable.ic_outline_person_24)
-//                                .centerCrop())
-//                        .into(artistImageView);
-//            } else {
-//                artistImageView.setImageResource(R.drawable.ic_outline_person_24);
-//            }
         } catch (Exception e) {
             Log.e(TAG, "Error setting up artist header: " + e.getMessage(), e);
         }

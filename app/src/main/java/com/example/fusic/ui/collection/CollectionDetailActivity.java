@@ -357,7 +357,6 @@ public class CollectionDetailActivity extends AppCompatActivity {
                 }
             });
 
-            // Attach ItemTouchHelper for drag and swipe functionality
             ItemTouchHelper itemTouchHelper = new ItemTouchHelper(new CollectionItemTouchHelperCallback());
             itemTouchHelper.attachToRecyclerView(songsRecyclerView);
 
@@ -366,7 +365,6 @@ public class CollectionDetailActivity extends AppCompatActivity {
         }
     }
 
-    // Add this inner class to CollectionDetailActivity for handling drag and swipe gestures:
     private class CollectionItemTouchHelperCallback extends ItemTouchHelper.Callback {
 
         private int dragFrom = -1;
@@ -400,7 +398,6 @@ public class CollectionDetailActivity extends AppCompatActivity {
             }
             dragTo = toPosition;
 
-            // Move in the list
             if (fromPosition < toPosition) {
                 for (int i = fromPosition; i < toPosition; i++) {
                     java.util.Collections.swap(collectionSongs, i, i + 1);
@@ -424,28 +421,23 @@ public class CollectionDetailActivity extends AppCompatActivity {
             if (position >= 0 && position < collectionSongs.size()) {
                 MusicItem removedItem = collectionSongs.get(position);
 
-                // Remove from the list
                 collectionSongs.remove(position);
                 if (musicAdapter != null) {
                     musicAdapter.notifyItemRemoved(position);
                 }
 
-                // Remove from collection in database
                 boolean removed = collectionManager.removeSongFromCollection(
                         collection.getId(),
                         removedItem.getId()
                 );
 
                 if (removed) {
-                    // Update song count
                     songCountTextView.setText(collectionSongs.size() + " songs");
 
-                    // Update UI if collection is now empty
                     if (collectionSongs.isEmpty()) {
                         updateUI();
                     }
 
-                    // Show snackbar with undo option
                     Snackbar snackbar = Snackbar.make(
                             songsRecyclerView,
                             "Removed from collection",
@@ -453,7 +445,6 @@ public class CollectionDetailActivity extends AppCompatActivity {
                     );
 
                     snackbar.setAction("UNDO", v -> {
-                        // Re-add to collection
                         boolean added = collectionManager.addSongToCollection(
                                 collection.getId(),
                                 removedItem.getId()
@@ -467,14 +458,12 @@ public class CollectionDetailActivity extends AppCompatActivity {
                             songCountTextView.setText(collectionSongs.size() + " songs");
                             updateUI();
 
-                            // Broadcast collection change
                             broadcastCollectionChange();
                         }
                     });
 
                     snackbar.show();
 
-                    // Broadcast collection change
                     broadcastCollectionChange();
                 } else {
                     Toast.makeText(
@@ -483,7 +472,6 @@ public class CollectionDetailActivity extends AppCompatActivity {
                             Toast.LENGTH_SHORT
                     ).show();
 
-                    // Re-add to list if database removal failed
                     collectionSongs.add(position, removedItem);
                     if (musicAdapter != null) {
                         musicAdapter.notifyItemInserted(position);
@@ -513,7 +501,6 @@ public class CollectionDetailActivity extends AppCompatActivity {
             viewHolder.itemView.setScaleY(1.0f);
             viewHolder.itemView.setElevation(0f);
 
-            // If item was dragged, update the collection order in database
             if (dragFrom != -1 && dragTo != -1 && dragFrom != dragTo) {
                 updateCollectionOrder();
             }
@@ -526,7 +513,6 @@ public class CollectionDetailActivity extends AppCompatActivity {
         public void onChildDraw(Canvas c, RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder,
                                 float dX, float dY, int actionState, boolean isCurrentlyActive) {
             if (actionState == ItemTouchHelper.ACTION_STATE_SWIPE) {
-                // Add fade-out effect while swiping
                 final float alpha = 1.0f - Math.abs(dX) / (float) viewHolder.itemView.getWidth();
                 viewHolder.itemView.setAlpha(alpha);
                 viewHolder.itemView.setTranslationX(dX);
@@ -542,13 +528,11 @@ public class CollectionDetailActivity extends AppCompatActivity {
         }
 
         try {
-            // Get the new order of music IDs
             List<Long> newOrder = new ArrayList<>();
             for (MusicItem item : collectionSongs) {
                 newOrder.add(item.getId());
             }
 
-            // Update the collection with new order
             collection.setMusicIds(newOrder);
             collectionManager.updateCollection(collection);
 

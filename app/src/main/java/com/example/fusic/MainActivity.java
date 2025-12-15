@@ -49,12 +49,10 @@ public class MainActivity extends AppCompatActivity {
     private CollapsingToolbarLayout collapsingToolbar;
     private String currentTitle = "Fusic";
 
-    // ViewPager2 for swipeable fragments
     private ViewPager2 viewPager;
     private MainViewPagerAdapter pagerAdapter;
     private BottomNavigationView navView;
 
-    // Mini Player Components
     private MaterialCardView miniPlayerContainer;
     private ImageView miniAlbumArt;
     private TextView miniSongTitle;
@@ -63,14 +61,12 @@ public class MainActivity extends AppCompatActivity {
     private MaterialButton miniNextButton;
     private MaterialButton miniCloseButton;
 
-    // State Management
     private MusicItem currentPlayingItem;
     private boolean isPlaying = false;
     private boolean isMiniPlayerVisible = false;
     private boolean isReceiverRegistered = false;
     private boolean isActivityDestroyed = false;
 
-    // Handlers
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private final BroadcastReceiver musicUpdateReceiver = new BroadcastReceiver() {
@@ -177,14 +173,11 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
 
-            // Setup ViewPager2 adapter
             pagerAdapter = new MainViewPagerAdapter(this);
             viewPager.setAdapter(pagerAdapter);
 
-            // Disable over-scroll effect for smoother experience
             viewPager.setOffscreenPageLimit(1);
 
-            // Sync ViewPager with BottomNavigationView
             viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
                 @Override
                 public void onPageSelected(int position) {
@@ -196,7 +189,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
 
-            // Setup BottomNavigationView click listener
             navView.setOnItemSelectedListener(item -> {
                 int itemId = item.getItemId();
                 int position = getPositionForMenuId(itemId);
@@ -305,15 +297,14 @@ public class MainActivity extends AppCompatActivity {
 
             int currentPosition = viewPager.getCurrentItem();
 
-            // Refresh based on current position
             switch (currentPosition) {
-                case 0: // Music
+                case 0:
                     showRefreshToast("Refreshing music library...");
                     break;
-                case 1: // Album
+                case 1:
                     showRefreshToast("Refreshing album library...");
                     break;
-                case 2: // Artist
+                case 2:
                     showRefreshToast("Refreshing artist library...");
                     break;
                 default:
@@ -321,7 +312,6 @@ public class MainActivity extends AppCompatActivity {
                     break;
             }
 
-            // Force adapter to recreate fragments
             pagerAdapter.notifyDataSetChanged();
 
         } catch (Exception e) {

@@ -182,8 +182,6 @@ public class ArtistFragment extends Fragment {
                 (System.currentTimeMillis() - lastCacheTime) < CACHE_DURATION;
     }
 
-    // In ArtistFragment.java
-
     private void loadFromCache() {
         if (binding != null && binding.artistRecyclerView != null) {
             binding.artistRecyclerView.post(() -> {
@@ -202,7 +200,6 @@ public class ArtistFragment extends Fragment {
     private void setupRecyclerView() {
         RecyclerView recyclerView = binding.artistRecyclerView;
 
-        // Performance optimizations
         recyclerView.setHasFixedSize(true);
         recyclerView.setItemViewCacheSize(20);
         recyclerView.setDrawingCacheEnabled(true);

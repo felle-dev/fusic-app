@@ -43,7 +43,6 @@ public class CollectionFragment extends Fragment {
     private static final String KEY_COLLECTIONS = "collections";
     private Gson gson;
 
-    // Broadcast action constants
     public static final String ACTION_COLLECTION_CHANGED = "com.example.fusic.COLLECTION_CHANGED";
     public static final String ACTION_COLLECTION_CREATED = "com.example.fusic.COLLECTION_CREATED";
     public static final String ACTION_SONG_ADDED_TO_COLLECTION = "com.example.fusic.SONG_ADDED_TO_COLLECTION";
@@ -58,13 +57,11 @@ public class CollectionFragment extends Fragment {
 
             String action = intent.getAction();
 
-            // Reload collection data whenever any collection-related action occurs
             if (ACTION_COLLECTION_CHANGED.equals(action) ||
                     ACTION_COLLECTION_CREATED.equals(action) ||
                     ACTION_SONG_ADDED_TO_COLLECTION.equals(action) ||
                     ACTION_SONG_REMOVED_FROM_COLLECTION.equals(action)) {
 
-                // Reload collections from storage
                 refreshCollections();
             }
         }
@@ -86,7 +83,6 @@ public class CollectionFragment extends Fragment {
         setupAddButtons();
         loadCollectionData();
 
-        // Register broadcast receiver
         registerCollectionUpdateReceiver();
 
         return root;
@@ -119,8 +115,6 @@ public class CollectionFragment extends Fragment {
             try {
                 getActivity().unregisterReceiver(collectionUpdateReceiver);
                 isReceiverRegistered = false;
-            } catch (IllegalArgumentException e) {
-                // Receiver not registered
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -150,17 +144,15 @@ public class CollectionFragment extends Fragment {
         RecyclerView recyclerView = binding.collectionRecyclerView;
         recyclerView.setHasFixedSize(true);
 
-        // GridLayoutManager with span size for the add button to take full width
         GridLayoutManager gridLayoutManager = new GridLayoutManager(getContext(), 2);
         gridLayoutManager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
             @Override
             public int getSpanSize(int position) {
-                // Make the add button (last item) span both columns
                 if (adapter != null && position == adapter.getItemCount() - 1
                         && adapter.getItemCount() > 0) {
-                    return 2; // Full width
+                    return 2;
                 }
-                return 1; // Normal collection items take 1 column
+                return 1;
             }
         });
         recyclerView.setLayoutManager(gridLayoutManager);
@@ -171,7 +163,6 @@ public class CollectionFragment extends Fragment {
     }
 
     private void setupAddButtons() {
-        // Only the empty state button now
         binding.btnCreateFirstCollection.setOnClickListener(v -> showAddCollectionDialog());
     }
 
@@ -201,7 +192,6 @@ public class CollectionFragment extends Fragment {
         executorService.execute(() -> {
             List<Collection> collections = loadCollections();
 
-            // Check for duplicate names
             for (Collection collection : collections) {
                 if (collection.getName().equalsIgnoreCase(name)) {
                     requireActivity().runOnUiThread(() ->
@@ -226,7 +216,6 @@ public class CollectionFragment extends Fragment {
                 updateEmptyState(collections.isEmpty());
                 Toast.makeText(requireContext(), "Collection created", Toast.LENGTH_SHORT).show();
 
-                // Broadcast collection created
                 broadcastCollectionChange(ACTION_COLLECTION_CREATED);
             });
         });
@@ -258,7 +247,6 @@ public class CollectionFragment extends Fragment {
                 updateEmptyState(collections.isEmpty());
                 Toast.makeText(requireContext(), "Collection deleted", Toast.LENGTH_SHORT).show();
 
-                // Broadcast collection changed
                 broadcastCollectionChange(ACTION_COLLECTION_CHANGED);
             });
         });
@@ -335,7 +323,6 @@ public class CollectionFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // Refresh collections when fragment becomes visible
         refreshCollections();
     }
 
@@ -348,7 +335,6 @@ public class CollectionFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
 
-        // Unregister receiver
         unregisterCollectionUpdateReceiver();
 
         if (executorService != null && !executorService.isShutdown()) {

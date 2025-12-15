@@ -8,7 +8,7 @@ public class ArtistItem implements Parcelable {
     private String artistName;
     private Uri artistImageUri;
     private int songCount;
-    private long totalDuration; // in milliseconds
+    private long totalDuration;
 
     public ArtistItem(String artistName, Uri artistImageUri, int songCount) {
         this.artistName = artistName != null ? artistName : "Unknown Artist";

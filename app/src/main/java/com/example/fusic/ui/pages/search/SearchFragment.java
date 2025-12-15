@@ -247,7 +247,6 @@ public class SearchFragment extends Fragment {
             public void onGlobalLayout() {
                 binding.searchEditText.getViewTreeObserver().removeOnGlobalLayoutListener(this);
 
-                // Now show the keyboard
                 showKeyboard();
             }
         });
@@ -264,7 +263,7 @@ public class SearchFragment extends Fragment {
                         imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, InputMethodManager.HIDE_IMPLICIT_ONLY);
                     }
                 }
-            }, 100); // 100ms delay
+            }, 100);
         }
     }
     private void performSearch(String query) {

@@ -59,10 +59,8 @@ public class AlbumFragment extends Fragment {
         executorService = Executors.newSingleThreadExecutor();
         setupRecyclerView();
 
-        // Always try to load, will check permission inside
         loadAlbumData();
 
-        // Also schedule a delayed check in case permission was just granted
         root.postDelayed(() -> {
             if (getContext() != null && albumList.isEmpty() && !isLoading) {
                 String permission;
@@ -191,7 +189,6 @@ public class AlbumFragment extends Fragment {
             return;
         }
 
-        // Use cache only if it's valid AND we've already loaded once
         if (isCacheValid() && hasLoadedOnce) {
             loadFromCache();
             return;
@@ -285,7 +282,6 @@ public class AlbumFragment extends Fragment {
                 permissionJustGranted = true;
                 Toast.makeText(getContext(), "Loading albums...", Toast.LENGTH_SHORT).show();
 
-                // Use postDelayed to ensure the fragment is fully ready
                 if (binding != null && binding.getRoot() != null) {
                     binding.getRoot().postDelayed(() -> {
                         if (getContext() != null && !isLoading) {
@@ -392,11 +388,7 @@ public class AlbumFragment extends Fragment {
 
                 int newCount = tempAlbumList.size();
                 if (newCount > 0) {
-                    if (previousSize == 0) {
-//                        Toast.makeText(getContext(),
-//                                "Loaded " + newCount + " albums",
-//                                Toast.LENGTH_SHORT).show();
-                    } else if (newCount == previousSize) {
+                    if (newCount == previousSize) {
                         Toast.makeText(getContext(),
                                 "Album library is up to date (" + newCount + " albums)",
                                 Toast.LENGTH_SHORT).show();
@@ -463,7 +455,6 @@ public class AlbumFragment extends Fragment {
     public void onResume() {
         super.onResume();
 
-        // Check if we have permission and no data loaded
         String permission;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             permission = Manifest.permission.READ_MEDIA_AUDIO;
@@ -471,14 +462,12 @@ public class AlbumFragment extends Fragment {
             permission = Manifest.permission.READ_EXTERNAL_STORAGE;
         }
 
-        // If permission granted but no data, load it
         if (getContext() != null &&
                 ContextCompat.checkSelfPermission(getContext(), permission) == PackageManager.PERMISSION_GRANTED &&
                 albumList.isEmpty() &&
                 !isLoading) {
             permissionJustGranted = false;
 
-            // Post with delay to ensure fragment is fully visible
             if (binding != null && binding.getRoot() != null) {
                 binding.getRoot().postDelayed(() -> {
                     if (getContext() != null && albumList.isEmpty() && !isLoading) {
@@ -495,7 +484,6 @@ public class AlbumFragment extends Fragment {
     public void setUserVisibleHint(boolean isVisibleToUser) {
         super.setUserVisibleHint(isVisibleToUser);
 
-        // Check when fragment becomes visible in ViewPager
         if (isVisibleToUser && isResumed()) {
             checkAndLoadIfNeeded();
         }
@@ -505,7 +493,6 @@ public class AlbumFragment extends Fragment {
     public void onHiddenChanged(boolean hidden) {
         super.onHiddenChanged(hidden);
 
-        // Check when fragment visibility changes
         if (!hidden) {
             checkAndLoadIfNeeded();
         }
@@ -519,7 +506,6 @@ public class AlbumFragment extends Fragment {
             permission = Manifest.permission.READ_EXTERNAL_STORAGE;
         }
 
-        // If we have permission but no data and not loading, load it
         if (getContext() != null &&
                 ContextCompat.checkSelfPermission(getContext(), permission) == PackageManager.PERMISSION_GRANTED &&
                 albumList.isEmpty() &&

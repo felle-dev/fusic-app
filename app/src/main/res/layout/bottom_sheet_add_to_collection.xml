@@ -7,7 +7,6 @@
     android:background="?attr/colorSurface"
     android:paddingTop="16dp">
 
-    <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -30,7 +29,6 @@
         android:layout_height="wrap_content"
         android:layout_marginBottom="8dp" />
 
-    <!-- Collections List -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/collectionsRecyclerView"
         android:layout_width="match_parent"
@@ -41,7 +39,6 @@
         android:clipToPadding="false"
         android:scrollbars="vertical" />
 
-    <!-- Empty State -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -70,7 +67,6 @@
 
     </LinearLayout>
 
-    <!-- Create New Collection Button -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/createNewCollectionButton"
         style="@style/Widget.Material3.Button.TonalButton"

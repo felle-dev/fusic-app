@@ -10,7 +10,6 @@
         android:orientation="vertical"
         android:padding="24dp">
 
-        <!-- Header -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -37,7 +36,6 @@
 
         </LinearLayout>
 
-        <!-- Scan Now Card -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/scan_now_button"
             android:layout_width="match_parent"
@@ -93,7 +91,6 @@
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Auto Scan Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -151,7 +148,6 @@
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Select Folders Card -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/select_folders_button"
             android:layout_width="match_parent"

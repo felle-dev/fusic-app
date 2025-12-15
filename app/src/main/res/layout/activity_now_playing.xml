@@ -51,7 +51,6 @@
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
-        <!-- Song info section -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -79,7 +78,6 @@
 
         </LinearLayout>
 
-        <!-- Progress bar section -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -137,7 +135,6 @@
 
         </LinearLayout>
 
-        <!-- Main playback controls -->
         <com.google.android.material.button.MaterialButtonGroup
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -181,7 +178,6 @@
 
         </com.google.android.material.button.MaterialButtonGroup>
 
-        <!-- Secondary controls -->
         <com.google.android.material.button.MaterialButtonGroup
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

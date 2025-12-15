@@ -90,7 +90,6 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- Changed to ViewPager2 for swipeable fragments -->
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/view_pager"
         android:layout_width="match_parent"
@@ -230,7 +229,6 @@
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Floating Bottom Navigation Bar -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/nav_view"
             android:layout_width="match_parent"
