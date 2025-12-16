@@ -28,7 +28,7 @@
                 android:scaleType="centerCrop"
                 android:fitsSystemWindows="true"
                 app:layout_collapseMode="parallax"
-                android:src="?attr/colorSurfaceContainerHigh"
+                android:src="?attr/colorPrimaryContainer"
                 app:layout_collapseParallaxMultiplier="0.7"
                 android:contentDescription="Artist background image" />
 

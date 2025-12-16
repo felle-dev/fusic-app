@@ -67,6 +67,7 @@
                         app:iconTint="?attr/colorOnSurfaceVariant"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
+                        android:backgroundTint="?attr/colorSurface"
                         app:cornerRadius="24dp" />
 
                     <com.google.android.material.button.MaterialButton
@@ -80,6 +81,7 @@
                         app:iconTint="?attr/colorOnSurfaceVariant"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
+                        android:backgroundTint="?attr/colorSurface"
                         app:cornerRadius="24dp" />
 
                 </LinearLayout>
