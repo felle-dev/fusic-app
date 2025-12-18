@@ -492,9 +492,9 @@ public class MusicFragment extends Fragment {
                                 "Music library is up to date (" + newCount + " songs)",
                                 Toast.LENGTH_SHORT).show();
                     } else {
-                        Toast.makeText(getContext(),
-                                "Library updated: " + newCount + " songs",
-                                Toast.LENGTH_SHORT).show();
+//                        Toast.makeText(getContext(),
+//                                "Library updated: " + newCount + " songs",
+//                                Toast.LENGTH_SHORT).show();
                     }
                 } else {
                     Toast.makeText(getContext(),

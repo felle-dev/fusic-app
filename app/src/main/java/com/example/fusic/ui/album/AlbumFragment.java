@@ -393,9 +393,9 @@ public class AlbumFragment extends Fragment {
                                 "Album library is up to date (" + newCount + " albums)",
                                 Toast.LENGTH_SHORT).show();
                     } else {
-                        Toast.makeText(getContext(),
-                                "Library updated: " + newCount + " albums",
-                                Toast.LENGTH_SHORT).show();
+//                        Toast.makeText(getContext(),
+//                                "Library updated: " + newCount + " albums",
+//                                Toast.LENGTH_SHORT).show();
                     }
                 } else {
                     Toast.makeText(getContext(),

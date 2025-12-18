@@ -29,7 +29,7 @@
                 android:fitsSystemWindows="true"
                 app:layout_collapseMode="parallax"
                 app:layout_collapseParallaxMultiplier="0.7"
-                android:src="?attr/colorPrimaryContainer"
+                android:src="?attr/colorPrimarySurface"
                 android:contentDescription="Collection background image" />
 
             <com.google.android.material.appbar.MaterialToolbar
@@ -87,6 +87,15 @@
                         android:textAppearance="?attr/textAppearanceBodySmall"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         tools:text="25 songs" />
+
+                    <TextView
+                        android:id="@+id/totalDurationTextView"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        tools:text="1h 30m" />
 
                 </LinearLayout>
 

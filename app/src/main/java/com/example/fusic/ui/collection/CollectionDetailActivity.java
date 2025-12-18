@@ -81,6 +81,7 @@ public class CollectionDetailActivity extends AppCompatActivity {
     private boolean isMiniPlayerVisible = false;
     private boolean isReceiverRegistered = false;
     private boolean isActivityDestroyed = false;
+    private TextView totalDurationTextView;
 
     private BroadcastReceiver musicUpdateReceiver = new BroadcastReceiver() {
         @Override
@@ -183,6 +184,7 @@ public class CollectionDetailActivity extends AppCompatActivity {
             emptyState = findViewById(R.id.emptyState);
             shuffleCollectionButton = findViewById(R.id.shuffleCollectionButton);
             deleteCollectionButton = findViewById(R.id.deleteCollectionButton);
+            totalDurationTextView = findViewById(R.id.totalDurationTextView);
 
             if (toolbar == null || collectionImageView == null || collectionNameTextView == null ||
                     songCountTextView == null || songsRecyclerView == null ||
@@ -196,6 +198,21 @@ public class CollectionDetailActivity extends AppCompatActivity {
         } catch (Exception e) {
             Log.e(TAG, "Error initializing views: " + e.getMessage(), e);
             return false;
+        }
+    }
+
+    private String formatTotalDuration(long totalMilliseconds) {
+        long totalSeconds = totalMilliseconds / 1000;
+        long hours = totalSeconds / 3600;
+        long minutes = (totalSeconds % 3600) / 60;
+        long seconds = totalSeconds % 60;
+
+        if (hours > 0) {
+            return String.format("%dh %dm", hours, minutes);
+        } else if (minutes > 0) {
+            return String.format("%dm %ds", minutes, seconds);
+        } else {
+            return String.format("%ds", seconds);
         }
     }
 
@@ -434,6 +451,12 @@ public class CollectionDetailActivity extends AppCompatActivity {
                 if (removed) {
                     songCountTextView.setText(collectionSongs.size() + " songs");
 
+                    long totalDuration = 0;
+                    for (MusicItem song : collectionSongs) {
+                        totalDuration += song.getDuration();
+                    }
+                    totalDurationTextView.setText(formatTotalDuration(totalDuration));
+
                     if (collectionSongs.isEmpty()) {
                         updateUI();
                     }
@@ -456,6 +479,13 @@ public class CollectionDetailActivity extends AppCompatActivity {
                                 musicAdapter.notifyItemInserted(position);
                             }
                             songCountTextView.setText(collectionSongs.size() + " songs");
+
+                            long totalDurations = 0;
+                            for (MusicItem song : collectionSongs) {
+                                totalDurations += song.getDuration();
+                            }
+                            totalDurationTextView.setText(formatTotalDuration(totalDurations));
+
                             updateUI();
 
                             broadcastCollectionChange();
@@ -631,9 +661,16 @@ public class CollectionDetailActivity extends AppCompatActivity {
 
                 songCountTextView.setText(collectionSongs.size() + " songs");
 
+                long totalDuration = 0;
+                for (MusicItem song : collectionSongs) {
+                    totalDuration += song.getDuration();
+                }
+                totalDurationTextView.setText(formatTotalDuration(totalDuration));
+
                 if (musicAdapter != null) {
                     musicAdapter.notifyDataSetChanged();
                 }
+
 
                 updateUI();
             });
