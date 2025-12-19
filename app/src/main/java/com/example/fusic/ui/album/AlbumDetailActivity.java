@@ -1,5 +1,8 @@
 package com.example.fusic.ui.album;
 
+import static com.example.fusic.ui.collection.CollectionFragment.ACTION_COLLECTION_CREATED;
+import static com.example.fusic.ui.collection.CollectionFragment.ACTION_SONG_ADDED_TO_COLLECTION;
+
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
@@ -14,6 +17,7 @@ import android.os.Bundle;
 import android.os.Parcelable;
 import android.provider.MediaStore;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ImageView;
@@ -30,11 +34,17 @@ import com.bumptech.glide.request.RequestOptions;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.TextInputEditText;
 
 import com.example.fusic.R;
 import com.example.fusic.ui.music.MusicAdapter;
 import com.example.fusic.ui.music.MusicItem;
 import com.example.fusic.ui.pages.nowplaying.NowPlayingActivity;
+import com.example.fusic.ui.pages.nowplaying.AddToCollectionAdapter;
+import com.example.fusic.ui.collection.Collection;
+import com.example.fusic.ui.collection.CollectionManager;
 import com.example.fusic.service.MusicService;
 
 import java.util.ArrayList;
@@ -70,6 +80,7 @@ public class AlbumDetailActivity extends AppCompatActivity {
     private MusicAdapter musicAdapter;
     private ExecutorService executorService;
     private boolean isLoading = false;
+    private CollectionManager collectionManager;
 
     private MusicItem currentPlayingItem;
     private boolean isPlaying = false;
@@ -124,6 +135,7 @@ public class AlbumDetailActivity extends AppCompatActivity {
 
         try {
             executorService = Executors.newSingleThreadExecutor();
+            collectionManager = new CollectionManager(this);
 
             if (!getAlbumDataFromIntent()) {
                 finish();
@@ -343,8 +355,143 @@ public class AlbumDetailActivity extends AppCompatActivity {
                     startMusicService(musicItem);
                 }
             });
+
+            // ADD THIS: Set long click listener
+            musicAdapter.setOnMusicItemLongClickListener(musicItem -> {
+                showAddToCollectionBottomSheet(musicItem);
+                return true;
+            });
         } catch (Exception e) {
             Log.e(TAG, "Error setting up RecyclerView: " + e.getMessage(), e);
+        }
+    }
+
+    // ADD THESE METHODS FOR COLLECTION:
+    private void showAddToCollectionBottomSheet(MusicItem musicItem) {
+        if (musicItem == null) {
+            return;
+        }
+
+        List<Collection> collections = collectionManager.getAllCollections();
+
+        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(this);
+        View view = LayoutInflater.from(this).inflate(
+                R.layout.bottom_sheet_add_to_collection,
+                null
+        );
+
+        RecyclerView collectionsRecyclerView = view.findViewById(R.id.collectionsRecyclerView);
+        TextView emptyCollectionsText = view.findViewById(R.id.emptyCollectionsText);
+        MaterialButton createNewCollectionButton = view.findViewById(R.id.createNewCollectionButton);
+
+        collectionsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+
+        if (collections.isEmpty()) {
+            collectionsRecyclerView.setVisibility(View.GONE);
+            emptyCollectionsText.setVisibility(View.VISIBLE);
+        } else {
+            collectionsRecyclerView.setVisibility(View.VISIBLE);
+            emptyCollectionsText.setVisibility(View.GONE);
+
+            AddToCollectionAdapter adapter = new AddToCollectionAdapter(
+                    collections,
+                    musicItem.getId(),
+                    collectionManager,
+                    collection -> {
+                        boolean added = collectionManager.addSongToCollection(
+                                collection.getId(),
+                                musicItem.getId()
+                        );
+                        if (added) {
+                            Toast.makeText(this,
+                                    "Added to " + collection.getName(),
+                                    Toast.LENGTH_SHORT).show();
+                            broadcastCollectionChange(ACTION_SONG_ADDED_TO_COLLECTION);
+                            bottomSheetDialog.dismiss();
+                        } else {
+                            Toast.makeText(this,
+                                    "Song already in " + collection.getName(),
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    }
+            );
+            collectionsRecyclerView.setAdapter(adapter);
+        }
+
+        createNewCollectionButton.setOnClickListener(v -> {
+            bottomSheetDialog.dismiss();
+            showCreateCollectionDialog(musicItem);
+        });
+
+        bottomSheetDialog.setContentView(view);
+        bottomSheetDialog.show();
+    }
+
+    private void showCreateCollectionDialog(MusicItem musicItem) {
+        View dialogView = LayoutInflater.from(this)
+                .inflate(R.layout.dialog_add_collection, null);
+
+        TextInputEditText editTextName = dialogView.findViewById(R.id.editTextCollectionName);
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("New Collection")
+                .setView(dialogView)
+                .setPositiveButton("Create", (dialog, which) -> {
+                    String collectionName = editTextName.getText().toString().trim();
+                    if (!collectionName.isEmpty()) {
+                        createCollectionAndAddSong(collectionName, musicItem);
+                    } else {
+                        Toast.makeText(this,
+                                "Collection name cannot be empty",
+                                Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void createCollectionAndAddSong(String collectionName, MusicItem musicItem) {
+        if (musicItem == null) {
+            return;
+        }
+
+        List<Collection> existingCollections = collectionManager.getAllCollections();
+        for (Collection collection : existingCollections) {
+            if (collection.getName().equalsIgnoreCase(collectionName)) {
+                Toast.makeText(this,
+                        "Collection already exists",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+
+        Collection newCollection = collectionManager.createCollection(collectionName);
+
+        boolean added = collectionManager.addSongToCollection(
+                newCollection.getId(),
+                musicItem.getId()
+        );
+
+        if (added) {
+            Toast.makeText(this,
+                    "Created \"" + collectionName + "\" and added song",
+                    Toast.LENGTH_SHORT).show();
+            broadcastCollectionChange(ACTION_COLLECTION_CREATED);
+        } else {
+            Toast.makeText(this,
+                    "Collection created",
+                    Toast.LENGTH_SHORT).show();
+            broadcastCollectionChange(ACTION_COLLECTION_CREATED);
+        }
+    }
+
+    private void broadcastCollectionChange(String action) {
+        try {
+            Intent intent = new Intent(action);
+            intent.setPackage(getPackageName());
+            sendBroadcast(intent);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 

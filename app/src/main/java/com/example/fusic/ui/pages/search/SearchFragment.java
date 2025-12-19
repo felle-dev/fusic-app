@@ -37,6 +37,9 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.TextInputEditText;
 
 import com.example.fusic.R;
 import com.example.fusic.databinding.SearchFragmentBinding;
@@ -44,11 +47,17 @@ import com.example.fusic.service.MusicService;
 import com.example.fusic.ui.music.MusicAdapter;
 import com.example.fusic.ui.music.MusicItem;
 import com.example.fusic.ui.pages.nowplaying.NowPlayingActivity;
+import com.example.fusic.ui.pages.nowplaying.AddToCollectionAdapter;
+import com.example.fusic.ui.collection.Collection;
+import com.example.fusic.ui.collection.CollectionManager;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import static com.example.fusic.ui.collection.CollectionFragment.ACTION_COLLECTION_CREATED;
+import static com.example.fusic.ui.collection.CollectionFragment.ACTION_SONG_ADDED_TO_COLLECTION;
 
 public class SearchFragment extends Fragment {
 
@@ -64,6 +73,7 @@ public class SearchFragment extends Fragment {
     private static final int PERMISSION_REQUEST_CODE = 124;
     private static final int SEARCH_DELAY = 300;
     private boolean isSearching = false;
+    private CollectionManager collectionManager;
 
     private MaterialCardView miniPlayerContainer;
     private ImageView miniAlbumArt;
@@ -126,6 +136,7 @@ public class SearchFragment extends Fragment {
 
         executorService = Executors.newSingleThreadExecutor();
         searchHandler = new Handler(Looper.getMainLooper());
+        collectionManager = new CollectionManager(requireContext());
 
         initializeMiniPlayer();
         setupRecyclerView();
@@ -209,7 +220,152 @@ public class SearchFragment extends Fragment {
                 startMusicService(musicItem);
             }
         });
+
+        // ADD THIS: Set long click listener
+        searchAdapter.setOnMusicItemLongClickListener(musicItem -> {
+            showAddToCollectionBottomSheet(musicItem);
+            return true;
+        });
     }
+
+    // ADD THESE METHODS FROM MusicFragment:
+    private void showAddToCollectionBottomSheet(MusicItem musicItem) {
+        if (getContext() == null || musicItem == null) {
+            return;
+        }
+
+        List<Collection> collections = collectionManager.getAllCollections();
+
+        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(requireContext());
+        View view = LayoutInflater.from(requireContext()).inflate(
+                R.layout.bottom_sheet_add_to_collection,
+                null
+        );
+
+        RecyclerView collectionsRecyclerView = view.findViewById(R.id.collectionsRecyclerView);
+        android.widget.TextView emptyCollectionsText = view.findViewById(R.id.emptyCollectionsText);
+        MaterialButton createNewCollectionButton = view.findViewById(R.id.createNewCollectionButton);
+
+        collectionsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+
+        if (collections.isEmpty()) {
+            collectionsRecyclerView.setVisibility(View.GONE);
+            emptyCollectionsText.setVisibility(View.VISIBLE);
+        } else {
+            collectionsRecyclerView.setVisibility(View.VISIBLE);
+            emptyCollectionsText.setVisibility(View.GONE);
+
+            AddToCollectionAdapter adapter = new AddToCollectionAdapter(
+                    collections,
+                    musicItem.getId(),
+                    collectionManager,
+                    collection -> {
+                        boolean added = collectionManager.addSongToCollection(
+                                collection.getId(),
+                                musicItem.getId()
+                        );
+                        if (added) {
+                            Toast.makeText(requireContext(),
+                                    "Added to " + collection.getName(),
+                                    Toast.LENGTH_SHORT).show();
+                            broadcastCollectionChange(ACTION_SONG_ADDED_TO_COLLECTION);
+                            bottomSheetDialog.dismiss();
+                        } else {
+                            Toast.makeText(requireContext(),
+                                    "Song already in " + collection.getName(),
+                                    Toast.LENGTH_SHORT).show();
+                        }
+                    }
+            );
+            collectionsRecyclerView.setAdapter(adapter);
+        }
+
+        createNewCollectionButton.setOnClickListener(v -> {
+            bottomSheetDialog.dismiss();
+            showCreateCollectionDialog(musicItem);
+        });
+
+        bottomSheetDialog.setContentView(view);
+        bottomSheetDialog.show();
+    }
+
+    private void showCreateCollectionDialog(MusicItem musicItem) {
+        if (getContext() == null) {
+            return;
+        }
+
+        View dialogView = LayoutInflater.from(requireContext())
+                .inflate(R.layout.dialog_add_collection, null);
+
+        TextInputEditText editTextName = dialogView.findViewById(R.id.editTextCollectionName);
+
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("New Collection")
+                .setView(dialogView)
+                .setPositiveButton("Create", (dialog, which) -> {
+                    String collectionName = editTextName.getText().toString().trim();
+                    if (!collectionName.isEmpty()) {
+                        createCollectionAndAddSong(collectionName, musicItem);
+                    } else {
+                        Toast.makeText(requireContext(),
+                                "Collection name cannot be empty",
+                                Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void createCollectionAndAddSong(String collectionName, MusicItem musicItem) {
+        if (getContext() == null || musicItem == null) {
+            return;
+        }
+
+        List<Collection> existingCollections = collectionManager.getAllCollections();
+        for (Collection collection : existingCollections) {
+            if (collection.getName().equalsIgnoreCase(collectionName)) {
+                Toast.makeText(requireContext(),
+                        "Collection already exists",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+
+        Collection newCollection = collectionManager.createCollection(collectionName);
+
+        boolean added = collectionManager.addSongToCollection(
+                newCollection.getId(),
+                musicItem.getId()
+        );
+
+        if (added) {
+            Toast.makeText(requireContext(),
+                    "Created \"" + collectionName + "\" and added song",
+                    Toast.LENGTH_SHORT).show();
+            broadcastCollectionChange(ACTION_COLLECTION_CREATED);
+        } else {
+            Toast.makeText(requireContext(),
+                    "Collection created",
+                    Toast.LENGTH_SHORT).show();
+            broadcastCollectionChange(ACTION_COLLECTION_CREATED);
+        }
+    }
+
+    private void broadcastCollectionChange(String action) {
+        if (getContext() == null) {
+            return;
+        }
+
+        try {
+            Intent intent = new Intent(action);
+            intent.setPackage(requireContext().getPackageName());
+            requireContext().sendBroadcast(intent);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // ... REST OF YOUR EXISTING CODE (setupSearchView, performSearch, etc.)
 
     private void setupSearchView() {
         binding.searchEditText.addTextChangedListener(new TextWatcher() {
@@ -246,7 +402,6 @@ public class SearchFragment extends Fragment {
             @Override
             public void onGlobalLayout() {
                 binding.searchEditText.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-
                 showKeyboard();
             }
         });
@@ -266,6 +421,7 @@ public class SearchFragment extends Fragment {
             }, 100);
         }
     }
+
     private void performSearch(String query) {
         if (query.isEmpty()) {
             showInitialState();
