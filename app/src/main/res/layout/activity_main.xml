@@ -50,7 +50,7 @@
                         android:layout_weight="1"
                         android:layout_marginStart="16dp"
                         android:textSize="24dp"
-                        android:text="RelMusic"
+                        android:text="Fusic"
                         android:textFontWeight="550"
                         android:textColor="?attr/colorOnSurface"
                         android:alpha="0.0"
