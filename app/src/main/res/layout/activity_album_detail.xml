@@ -77,7 +77,7 @@
                         android:layout_height="wrap_content"
                         android:ellipsize="end"
                         android:maxLines="1"
-                        android:textAppearance="?attr/textAppearanceTitleMedium"
+                        android:textAppearance="?attr/textAppearanceTitleLarge"
                         android:textColor="?attr/colorOnSurface"
                         tools:text="Album Name" />
 
