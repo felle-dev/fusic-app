@@ -7,6 +7,7 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
+import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -47,11 +48,19 @@ import com.example.fusic.ui.collection.Collection;
 import com.example.fusic.ui.collection.CollectionManager;
 import com.example.fusic.service.MusicService;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import android.app.RecoverableSecurityException;
+import android.content.IntentSender;
+import android.os.Build;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.IntentSenderRequest;
+import androidx.activity.result.contract.ActivityResultContracts;
 
 public class AlbumDetailActivity extends AppCompatActivity {
 
@@ -66,6 +75,7 @@ public class AlbumDetailActivity extends AppCompatActivity {
     private View loadingLayout;
     private View emptyState;
     private MaterialButton shuffleAlbumButton;
+    private TextView totalDurationTextView;
 
     private MaterialCardView miniPlayerContainer;
     private ImageView miniAlbumArt;
@@ -88,6 +98,9 @@ public class AlbumDetailActivity extends AppCompatActivity {
     private boolean isReceiverRegistered = false;
     private boolean isActivityDestroyed = false;
 
+    private static final int REQUEST_CODE_DELETE_PERMISSION = 1001;
+    private MusicItem pendingDeleteItem = null;
+    private ActivityResultLauncher<IntentSenderRequest> deletePermissionLauncher;
 
     private BroadcastReceiver musicUpdateReceiver = new BroadcastReceiver() {
         @Override
@@ -128,6 +141,25 @@ public class AlbumDetailActivity extends AppCompatActivity {
         }
     };
 
+    private void setupDeletePermissionLauncher() {
+        deletePermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartIntentSenderForResult(),
+                result -> {
+                    if (result.getResultCode() == RESULT_OK) {
+                        if (pendingDeleteItem != null) {
+                            deleteSongAfterPermission(pendingDeleteItem);
+                            pendingDeleteItem = null;
+                        }
+                    } else {
+                        Toast.makeText(this,
+                                "Permission denied to delete file",
+                                Toast.LENGTH_SHORT).show();
+                        pendingDeleteItem = null;
+                    }
+                }
+        );
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -161,6 +193,7 @@ public class AlbumDetailActivity extends AppCompatActivity {
 
             loadAlbumSongs();
 
+            setupDeletePermissionLauncher();
             registerMusicUpdateReceiver();
 
         } catch (Exception e) {
@@ -189,6 +222,7 @@ public class AlbumDetailActivity extends AppCompatActivity {
             loadingLayout = findViewById(R.id.loadingLayout);
             emptyState = findViewById(R.id.emptyState);
             shuffleAlbumButton = findViewById(R.id.shuffleAlbumButton);
+            totalDurationTextView = findViewById(R.id.totalDurationTextView);
 
             if (toolbar == null || albumArtImageView == null || albumTitleTextView == null ||
                     albumArtistTextView == null || songCountTextView == null ||
@@ -202,6 +236,21 @@ public class AlbumDetailActivity extends AppCompatActivity {
         } catch (Exception e) {
             Log.e(TAG, "Error initializing views: " + e.getMessage(), e);
             return false;
+        }
+    }
+
+    private String formatTotalDuration(long totalMilliseconds) {
+        long totalSeconds = totalMilliseconds / 1000;
+        long hours = totalSeconds / 3600;
+        long minutes = (totalSeconds % 3600) / 60;
+        long seconds = totalSeconds % 60;
+
+        if (hours > 0) {
+            return String.format("%dh %dm", hours, minutes);
+        } else if (minutes > 0) {
+            return String.format("%dm %ds", minutes, seconds);
+        } else {
+            return String.format("%ds", seconds);
         }
     }
 
@@ -356,9 +405,8 @@ public class AlbumDetailActivity extends AppCompatActivity {
                 }
             });
 
-            // ADD THIS: Set long click listener
             musicAdapter.setOnMusicItemLongClickListener(musicItem -> {
-                showAddToCollectionBottomSheet(musicItem);
+                showSongOptionsDialog(musicItem);
                 return true;
             });
         } catch (Exception e) {
@@ -366,7 +414,237 @@ public class AlbumDetailActivity extends AppCompatActivity {
         }
     }
 
-    // ADD THESE METHODS FOR COLLECTION:
+    private void showSongOptionsDialog(MusicItem musicItem) {
+        if (musicItem == null) {
+            return;
+        }
+
+        String[] options = {"View Details", "Add to Collection", "Delete"};
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(musicItem.getTitle())
+                .setItems(options, (dialog, which) -> {
+                    switch (which) {
+                        case 0: // View Details
+                            showSongDetailDialog(musicItem);
+                            break;
+                        case 1: // Add to Collection
+                            showAddToCollectionBottomSheet(musicItem);
+                            break;
+                        case 2: // Delete
+                            showDeleteConfirmationDialog(musicItem);
+                            break;
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showSongDetailDialog(MusicItem musicItem) {
+        if (musicItem == null) {
+            return;
+        }
+
+        View dialogView = LayoutInflater.from(this)
+                .inflate(R.layout.dialog_song_details, null);
+
+        TextView titleText = dialogView.findViewById(R.id.detailTitleText);
+        TextView artistText = dialogView.findViewById(R.id.detailArtistText);
+        TextView albumText = dialogView.findViewById(R.id.detailAlbumText);
+        TextView durationText = dialogView.findViewById(R.id.detailDurationText);
+        TextView pathText = dialogView.findViewById(R.id.detailPathText);
+        TextView fileSizeText = dialogView.findViewById(R.id.detailFileSizeText);
+
+        titleText.setText(musicItem.getTitle());
+        artistText.setText(musicItem.getArtist());
+        albumText.setText(musicItem.getAlbum());
+        durationText.setText(formatDuration(musicItem.getDuration()));
+        pathText.setText(musicItem.getPath());
+
+        // Get file size
+        File file = new File(musicItem.getPath());
+        if (file.exists()) {
+            long fileSizeInBytes = file.length();
+            String fileSize = formatFileSize(fileSizeInBytes);
+            fileSizeText.setText(fileSize);
+        } else {
+            fileSizeText.setText("Unknown");
+        }
+
+        new MaterialAlertDialogBuilder(this)
+                .setView(dialogView)
+                .setPositiveButton("Close", null)
+                .show();
+    }
+
+    private String formatDuration(long duration) {
+        long seconds = (duration / 1000) % 60;
+        long minutes = (duration / (1000 * 60)) % 60;
+        long hours = (duration / (1000 * 60 * 60));
+
+        if (hours > 0) {
+            return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+        } else {
+            return String.format("%02d:%02d", minutes, seconds);
+        }
+    }
+
+    private String formatFileSize(long size) {
+        if (size <= 0) return "0 B";
+
+        final String[] units = new String[]{"B", "KB", "MB", "GB"};
+        int digitGroups = (int) (Math.log10(size) / Math.log10(1024));
+
+        return String.format("%.2f %s",
+                size / Math.pow(1024, digitGroups),
+                units[digitGroups]);
+    }
+
+    private void showDeleteConfirmationDialog(MusicItem musicItem) {
+        if (musicItem == null) {
+            return;
+        }
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Delete Song")
+                .setMessage("Are you sure you want to delete \"" + musicItem.getTitle() + "\"? This action cannot be undone.")
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    deleteSong(musicItem);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void deleteSong(MusicItem musicItem) {
+        if (musicItem == null) {
+            return;
+        }
+
+        try {
+            Uri uri = ContentUris.withAppendedId(
+                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                    musicItem.getId()
+            );
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                try {
+                    int rowsDeleted = getContentResolver().delete(uri, null, null);
+                    if (rowsDeleted > 0) {
+                        onSongDeleteSuccess(musicItem);
+                    } else {
+                        Toast.makeText(this, "Failed to delete song", Toast.LENGTH_SHORT).show();
+                    }
+                } catch (SecurityException securityException) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        RecoverableSecurityException recoverableException;
+                        if (securityException instanceof RecoverableSecurityException) {
+                            recoverableException = (RecoverableSecurityException) securityException;
+
+                            pendingDeleteItem = musicItem;
+                            IntentSenderRequest intentSenderRequest = new IntentSenderRequest.Builder(
+                                    recoverableException.getUserAction().getActionIntent().getIntentSender()
+                            ).build();
+                            deletePermissionLauncher.launch(intentSenderRequest);
+                        } else {
+                            throw securityException;
+                        }
+                    } else {
+                        throw securityException;
+                    }
+                }
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try {
+                    int rowsDeleted = getContentResolver().delete(uri, null, null);
+                    if (rowsDeleted > 0) {
+                        onSongDeleteSuccess(musicItem);
+                    } else {
+                        Toast.makeText(this, "Failed to delete song", Toast.LENGTH_SHORT).show();
+                    }
+                } catch (SecurityException securityException) {
+                    RecoverableSecurityException recoverableException;
+                    if (securityException instanceof RecoverableSecurityException) {
+                        recoverableException = (RecoverableSecurityException) securityException;
+
+                        pendingDeleteItem = musicItem;
+                        IntentSenderRequest intentSenderRequest = new IntentSenderRequest.Builder(
+                                recoverableException.getUserAction().getActionIntent().getIntentSender()
+                        ).build();
+                        deletePermissionLauncher.launch(intentSenderRequest);
+                    } else {
+                        Toast.makeText(this,
+                                "Permission denied. Cannot delete this file.",
+                                Toast.LENGTH_SHORT).show();
+                    }
+                }
+            } else {
+                int rowsDeleted = getContentResolver().delete(uri, null, null);
+
+                if (rowsDeleted > 0) {
+                    File file = new File(musicItem.getPath());
+                    file.delete();
+                    onSongDeleteSuccess(musicItem);
+                } else {
+                    Toast.makeText(this, "Failed to delete song", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+        } catch (Exception e) {
+            Toast.makeText(this, "Error deleting song: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Error deleting song: " + e.getMessage(), e);
+        }
+    }
+
+    private void deleteSongAfterPermission(MusicItem musicItem) {
+        if (musicItem == null) {
+            return;
+        }
+
+        try {
+            Uri uri = ContentUris.withAppendedId(
+                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                    musicItem.getId()
+            );
+
+            int rowsDeleted = getContentResolver().delete(uri, null, null);
+
+            if (rowsDeleted > 0) {
+                onSongDeleteSuccess(musicItem);
+            } else {
+                Toast.makeText(this, "Failed to delete song", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "Error deleting song: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Error deleting song after permission: " + e.getMessage(), e);
+        }
+    }
+
+    private void onSongDeleteSuccess(MusicItem musicItem) {
+        Toast.makeText(this, "Song deleted successfully", Toast.LENGTH_SHORT).show();
+
+        albumSongs.remove(musicItem);
+        if (musicAdapter != null) {
+            musicAdapter.notifyDataSetChanged();
+        }
+
+        songCountTextView.setText(albumSongs.size() + " songs");
+
+        long totalDuration = 0;
+        for (MusicItem song : albumSongs) {
+            totalDuration += song.getDuration();
+        }
+        totalDurationTextView.setText(formatTotalDuration(totalDuration));
+
+        updateUI();
+
+        // If the deleted song is currently playing, stop it
+        if (currentPlayingItem != null &&
+                currentPlayingItem.getId() == musicItem.getId()) {
+            Intent stopIntent = new Intent(this, MusicService.class);
+            stopIntent.setAction(MusicService.ACTION_STOP);
+            startService(stopIntent);
+        }
+    }
+
     private void showAddToCollectionBottomSheet(MusicItem musicItem) {
         if (musicItem == null) {
             return;
@@ -573,6 +851,12 @@ public class AlbumDetailActivity extends AppCompatActivity {
                 albumSongs.addAll(tempSongsList);
 
                 songCountTextView.setText(albumSongs.size() + " songs");
+
+                long totalDuration = 0;
+                for (MusicItem song : albumSongs) {
+                    totalDuration += song.getDuration();
+                }
+                totalDurationTextView.setText(formatTotalDuration(totalDuration));
 
                 if (musicAdapter != null) {
                     musicAdapter.notifyDataSetChanged();

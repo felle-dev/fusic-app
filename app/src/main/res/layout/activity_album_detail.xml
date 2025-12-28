@@ -101,6 +101,16 @@
                         android:textColor="?attr/colorOnSurfaceVariant"
                         tools:text="12 songs" />
 
+                    <TextView
+                        android:id="@+id/totalDurationTextView"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        tools:text="1h 30m" />
+
+
                 </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
