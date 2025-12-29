@@ -2,14 +2,17 @@ package com.example.fusic.ui.pages.search;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.RecoverableSecurityException;
 import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
+import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -27,6 +30,9 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.IntentSenderRequest;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -51,6 +57,7 @@ import com.example.fusic.ui.pages.nowplaying.AddToCollectionAdapter;
 import com.example.fusic.ui.collection.Collection;
 import com.example.fusic.ui.collection.CollectionManager;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -89,6 +96,8 @@ public class SearchFragment extends Fragment {
     private boolean isReceiverRegistered = false;
     private boolean isFragmentDestroyed = false;
 
+    private MusicItem pendingDeleteItem = null;
+    private ActivityResultLauncher<IntentSenderRequest> deletePermissionLauncher;
 
     private BroadcastReceiver miniPlayerReceiver = new BroadcastReceiver() {
         @Override
@@ -138,12 +147,32 @@ public class SearchFragment extends Fragment {
         searchHandler = new Handler(Looper.getMainLooper());
         collectionManager = new CollectionManager(requireContext());
 
+        setupDeletePermissionLauncher();
         initializeMiniPlayer();
         setupRecyclerView();
         setupSearchView();
         loadAllMusic();
 
         return root;
+    }
+
+    private void setupDeletePermissionLauncher() {
+        deletePermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartIntentSenderForResult(),
+                result -> {
+                    if (result.getResultCode() == getActivity().RESULT_OK) {
+                        if (pendingDeleteItem != null) {
+                            deleteSongAfterPermission(pendingDeleteItem);
+                            pendingDeleteItem = null;
+                        }
+                    } else {
+                        Toast.makeText(requireContext(),
+                                "Permission denied to delete file",
+                                Toast.LENGTH_SHORT).show();
+                        pendingDeleteItem = null;
+                    }
+                }
+        );
     }
 
     private void initializeMiniPlayer() {
@@ -221,14 +250,241 @@ public class SearchFragment extends Fragment {
             }
         });
 
-        // ADD THIS: Set long click listener
+        // Set long click listener to show options dialog
         searchAdapter.setOnMusicItemLongClickListener(musicItem -> {
-            showAddToCollectionBottomSheet(musicItem);
+            showSongOptionsDialog(musicItem);
             return true;
         });
     }
 
-    // ADD THESE METHODS FROM MusicFragment:
+    private void showSongOptionsDialog(MusicItem musicItem) {
+        if (getContext() == null || musicItem == null) {
+            return;
+        }
+
+        String[] options = {"View Details", "Add to Collection", "Delete"};
+
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(musicItem.getTitle())
+                .setItems(options, (dialog, which) -> {
+                    switch (which) {
+                        case 0: // View Details
+                            showSongDetailDialog(musicItem);
+                            break;
+                        case 1: // Add to Collection
+                            showAddToCollectionBottomSheet(musicItem);
+                            break;
+                        case 2: // Delete
+                            showDeleteConfirmationDialog(musicItem);
+                            break;
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showSongDetailDialog(MusicItem musicItem) {
+        if (getContext() == null || musicItem == null) {
+            return;
+        }
+
+        View dialogView = LayoutInflater.from(requireContext())
+                .inflate(R.layout.dialog_song_details, null);
+
+        TextView titleText = dialogView.findViewById(R.id.detailTitleText);
+        TextView artistText = dialogView.findViewById(R.id.detailArtistText);
+        TextView albumText = dialogView.findViewById(R.id.detailAlbumText);
+        TextView durationText = dialogView.findViewById(R.id.detailDurationText);
+        TextView pathText = dialogView.findViewById(R.id.detailPathText);
+        TextView fileSizeText = dialogView.findViewById(R.id.detailFileSizeText);
+
+        titleText.setText(musicItem.getTitle());
+        artistText.setText(musicItem.getArtist());
+        albumText.setText(musicItem.getAlbum());
+        durationText.setText(formatDuration(musicItem.getDuration()));
+        pathText.setText(musicItem.getPath());
+
+        // Get file size
+        File file = new File(musicItem.getPath());
+        if (file.exists()) {
+            long fileSizeInBytes = file.length();
+            String fileSize = formatFileSize(fileSizeInBytes);
+            fileSizeText.setText(fileSize);
+        } else {
+            fileSizeText.setText("Unknown");
+        }
+
+        new MaterialAlertDialogBuilder(requireContext())
+                .setView(dialogView)
+                .setPositiveButton("Close", null)
+                .show();
+    }
+
+    private String formatDuration(long duration) {
+        long seconds = (duration / 1000) % 60;
+        long minutes = (duration / (1000 * 60)) % 60;
+        long hours = (duration / (1000 * 60 * 60));
+
+        if (hours > 0) {
+            return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+        } else {
+            return String.format("%02d:%02d", minutes, seconds);
+        }
+    }
+
+    private String formatFileSize(long size) {
+        if (size <= 0) return "0 B";
+
+        final String[] units = new String[]{"B", "KB", "MB", "GB"};
+        int digitGroups = (int) (Math.log10(size) / Math.log10(1024));
+
+        return String.format("%.2f %s",
+                size / Math.pow(1024, digitGroups),
+                units[digitGroups]);
+    }
+
+    private void showDeleteConfirmationDialog(MusicItem musicItem) {
+        if (getContext() == null || musicItem == null) {
+            return;
+        }
+
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Delete Song")
+                .setMessage("Are you sure you want to delete \"" + musicItem.getTitle() + "\"? This action cannot be undone.")
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    deleteSong(musicItem);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void deleteSong(MusicItem musicItem) {
+        if (getContext() == null || musicItem == null) {
+            return;
+        }
+
+        try {
+            Uri uri = ContentUris.withAppendedId(
+                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                    musicItem.getId()
+            );
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                try {
+                    int rowsDeleted = requireContext().getContentResolver().delete(uri, null, null);
+                    if (rowsDeleted > 0) {
+                        onSongDeleteSuccess(musicItem);
+                    } else {
+                        Toast.makeText(requireContext(), "Failed to delete song", Toast.LENGTH_SHORT).show();
+                    }
+                } catch (SecurityException securityException) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        RecoverableSecurityException recoverableException;
+                        if (securityException instanceof RecoverableSecurityException) {
+                            recoverableException = (RecoverableSecurityException) securityException;
+
+                            pendingDeleteItem = musicItem;
+                            IntentSenderRequest intentSenderRequest = new IntentSenderRequest.Builder(
+                                    recoverableException.getUserAction().getActionIntent().getIntentSender()
+                            ).build();
+                            deletePermissionLauncher.launch(intentSenderRequest);
+                        } else {
+                            throw securityException;
+                        }
+                    } else {
+                        throw securityException;
+                    }
+                }
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try {
+                    int rowsDeleted = requireContext().getContentResolver().delete(uri, null, null);
+                    if (rowsDeleted > 0) {
+                        onSongDeleteSuccess(musicItem);
+                    } else {
+                        Toast.makeText(requireContext(), "Failed to delete song", Toast.LENGTH_SHORT).show();
+                    }
+                } catch (SecurityException securityException) {
+                    RecoverableSecurityException recoverableException;
+                    if (securityException instanceof RecoverableSecurityException) {
+                        recoverableException = (RecoverableSecurityException) securityException;
+
+                        pendingDeleteItem = musicItem;
+                        IntentSenderRequest intentSenderRequest = new IntentSenderRequest.Builder(
+                                recoverableException.getUserAction().getActionIntent().getIntentSender()
+                        ).build();
+                        deletePermissionLauncher.launch(intentSenderRequest);
+                    } else {
+                        Toast.makeText(requireContext(),
+                                "Permission denied. Cannot delete this file.",
+                                Toast.LENGTH_SHORT).show();
+                    }
+                }
+            } else {
+                int rowsDeleted = requireContext().getContentResolver().delete(uri, null, null);
+
+                if (rowsDeleted > 0) {
+                    File file = new File(musicItem.getPath());
+                    file.delete();
+                    onSongDeleteSuccess(musicItem);
+                } else {
+                    Toast.makeText(requireContext(), "Failed to delete song", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+        } catch (Exception e) {
+            Toast.makeText(requireContext(), "Error deleting song: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Error deleting song: " + e.getMessage(), e);
+        }
+    }
+
+    private void deleteSongAfterPermission(MusicItem musicItem) {
+        if (getContext() == null || musicItem == null) {
+            return;
+        }
+
+        try {
+            Uri uri = ContentUris.withAppendedId(
+                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                    musicItem.getId()
+            );
+
+            int rowsDeleted = requireContext().getContentResolver().delete(uri, null, null);
+
+            if (rowsDeleted > 0) {
+                onSongDeleteSuccess(musicItem);
+            } else {
+                Toast.makeText(requireContext(), "Failed to delete song", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Toast.makeText(requireContext(), "Error deleting song: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Error deleting song after permission: " + e.getMessage(), e);
+        }
+    }
+
+    private void onSongDeleteSuccess(MusicItem musicItem) {
+        Toast.makeText(requireContext(), "Song deleted successfully", Toast.LENGTH_SHORT).show();
+
+        // Remove from search results
+        searchResults.remove(musicItem);
+
+        // Also remove from all music list
+        allMusicList.remove(musicItem);
+
+        if (searchAdapter != null) {
+            searchAdapter.notifyDataSetChanged();
+        }
+
+        // Update UI based on current search state
+        String currentQuery = binding.searchEditText.getText().toString().trim();
+        updateUI(currentQuery);
+
+        // Broadcast to update other fragments/activities
+        Intent intent = new Intent("SONG_DELETED");
+        intent.putExtra("song_id", musicItem.getId());
+        intent.setPackage(requireContext().getPackageName());
+        requireContext().sendBroadcast(intent);
+    }
+
     private void showAddToCollectionBottomSheet(MusicItem musicItem) {
         if (getContext() == null || musicItem == null) {
             return;
@@ -364,8 +620,6 @@ public class SearchFragment extends Fragment {
             e.printStackTrace();
         }
     }
-
-    // ... REST OF YOUR EXISTING CODE (setupSearchView, performSearch, etc.)
 
     private void setupSearchView() {
         binding.searchEditText.addTextChangedListener(new TextWatcher() {
