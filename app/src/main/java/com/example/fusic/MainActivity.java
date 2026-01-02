@@ -178,6 +178,9 @@ public class MainActivity extends AppCompatActivity {
 
             viewPager.setOffscreenPageLimit(1);
 
+            // Disable swipe gestures
+            viewPager.setUserInputEnabled(false);
+
             viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
                 @Override
                 public void onPageSelected(int position) {
@@ -205,7 +208,6 @@ public class MainActivity extends AppCompatActivity {
             Log.e(TAG, "Error setting up ViewPager: " + e.getMessage(), e);
         }
     }
-
     private int getPositionForMenuId(int menuId) {
         if (menuId == R.id.navigation_music) {
             return 0;
