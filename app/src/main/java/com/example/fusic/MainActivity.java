@@ -196,7 +196,7 @@ public class MainActivity extends AppCompatActivity {
                 int itemId = item.getItemId();
                 int position = getPositionForMenuId(itemId);
                 if (position != -1) {
-                    viewPager.setCurrentItem(position, true);
+                    viewPager.setCurrentItem(position, false); // false = no animation
                     return true;
                 }
                 return false;
