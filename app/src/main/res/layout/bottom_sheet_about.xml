@@ -32,7 +32,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Rel Music"
+                    android:text="Fusic"
                     android:textAppearance="?attr/textAppearanceHeadlineSmall"
                     android:textColor="?attr/colorOnSurface" />
 
@@ -74,7 +74,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Rel Music is a modern music player app designed with Material You principles. Enjoy your music with a beautiful, dynamic interface that adapts to your device's theme."
+                    android:text="Fusic is a modern music player app designed with Material You principles. Enjoy your music with a beautiful, dynamic interface that adapts to your device's theme."
                     android:textAppearance="?attr/textAppearanceBodyMedium"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:lineSpacingMultiplier="1.2" />

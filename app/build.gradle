@@ -3,11 +3,11 @@ plugins {
 }
 
 android {
-    namespace 'com.example.fusic'
+    namespace 'com.felle.fusic'
     compileSdk 36
 
     defaultConfig {
-        applicationId "com.example.fusic"
+        applicationId "com.felle.fusic"
         minSdk 24
         targetSdk 36
         versionCode 10

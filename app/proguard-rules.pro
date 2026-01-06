@@ -19,3 +19,20 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+# Keep Parcelable classes
+-keep class com.felle.fusic.ui.collection.Collection { *; }
+-keep class com.felle.fusic.ui.collection.** { *; }
+-keep class com.felle.fusic.ui.album.AlbumItem { *; }
+-keep class com.felle.fusic.ui.music.MusicItem { *; }
+
+# Keep all Parcelable implementations
+-keepclassmembers class * implements android.os.Parcelable {
+    public static final ** CREATOR;
+}
+
+# Keep custom view classes
+-keep public class * extends android.view.View {
+    public <init>(android.content.Context);
+    public <init>(android.content.Context, android.util.AttributeSet);
+    public <init>(android.content.Context, android.util.AttributeSet, int);
+}
