@@ -22,8 +22,6 @@
   <img src="./screenshot/ss3.jpg" width="200" alt="Artist View">
 </div>
 
----
-
 ## **Tech Stack**
 
 - **Language:** Java
