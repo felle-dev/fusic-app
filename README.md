@@ -67,4 +67,4 @@ This project is licensed under the **GNU General Public License v3.0**. See the 
 
 [release-badge]: https://img.shields.io/github/v/release/felle-dev/fusic-app?style=for-the-badge
 [flutter-badge]: https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white
-[license-badge]: https://img.shields.io/github/license/felle-dev/fends-app?style=for-the-badge
+[license-badge]: https://img.shields.io/github/license/felle-dev/fusic-app?style=for-the-badge
